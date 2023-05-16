@@ -34,17 +34,18 @@ def load_10X_matrices(matrix_dir):
     
     # Loop through the files and concatenate the matrices
     mtx_files = [x for x in matrix_files if x.find('.mtx') > -1]
-    # find out whehter files has prefix
-    prefixes = [x for x in mtx_files if x.split('matrix.mtx')[0] != '']  
-
-    # create a list to hold adatas
-    adata_list = []
+    
+    # find out whehter files has prefix, use set to remove duplicates
+    prefixes = set([x for x in mtx_files if x.split('matrix.mtx')[0] != ''])  
 
     if len(prefixes) > 0:
-        # interate through prefixes and index mtx_files
-        matrix_dir = os.path(matrix_dir)
-        for index, prefix in enumerate(prefixes):            
-            tmp = sc.read_10x_mtx(matrix_dir, prefixes=prefix)
+        # create a list to hold adatas
+        adata_list = []
+        matrix_dir_p = os.path(matrix_dir)
+
+        # interate through prefixes and index mtx_files        
+        for index, prefix in enumerate(prefixes): 
+            tmp = sc.read_10x_mtx(matrix_dir_p, prefix=prefix)
             adata_list.append(tmp)
 
     # concatenate adata_list
