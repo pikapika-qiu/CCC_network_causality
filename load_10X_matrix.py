@@ -50,3 +50,4 @@ def load_10X_matrices(matrix_dir):
 
     # concatenate adata_list
     overall_adata = ad.concatenate(adata_list, join='outer')
+    return overall_adata

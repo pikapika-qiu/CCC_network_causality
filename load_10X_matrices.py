@@ -1,5 +1,5 @@
 ''' 
-load_10X_matrice.py
+load_10X_matrices.py
 
 This function module will load a fold of 10X matrix files into a single sparse matrix
 and return a single AnnData object by concatenating the matrices.
@@ -27,28 +27,30 @@ def load_10X_matrices(matrix_dir):
 
     '''
     # Open the matrix directory and get the list of files
+    matrix_dir = "/home/data/PanCanSC/CRC/GEO/GSE161277/GSE161277_RAW" # temporary? matrix_dir is not specified otherwise so I manually added a path 
     matrix_files = os.listdir(matrix_dir)
 
     # Initialize the AnnData object
     adata = sc.AnnData()
-    
+
     # Loop through the files and concatenate the matrices
-    mtx_files = [x for x in matrix_files if x.find('.mtx') > -1]
-    
-    # find out whehter files has prefix, use set to remove duplicates
-    prefixes = set([x for x in mtx_files if x.split('matrix.mtx')[0] != ''])  
+    mtx_files = [x for x in matrix_files if '.mtx' in x]
+        
+    # find out whether files has prefix, use set to remove duplicates
+    prefixes = set([x.split('matrix.mtx')[0] for x in mtx_files if '_matrix.mtx' in x]) 
 
     if len(prefixes) > 0:
         # create a list to hold adatas
         adata_list = []
-        matrix_dir_p = os.path(matrix_dir)
+        matrix_dir_p = os.path.join(matrix_dir)
 
         # interate through prefixes and index mtx_files        
         for index, prefix in enumerate(prefixes): 
-            tmp_adata = sc.read_10x_mtx(matrix_dir_p, prefix=prefix)
-            tmp_adata.obs['sample_id'] = prefix
-            adata_list.append(tmp_adata)
+            tmp = sc.read_10x_mtx(matrix_dir_p, prefix = prefix)
+            tmp.obs['sample_ID'] = prefix 
+            adata_list.append(tmp)
+
 
     # concatenate adata_list
-    overall_adata = ad.concatenate(adata_list, join='outer')
+    overall_adata = ad.concat(adata_list, join='outer')
     return overall_adata
