@@ -27,7 +27,6 @@ def load_10X_matrices(matrix_dir):
 
     '''
     # Open the matrix directory and get the list of files
-    matrix_dir = "/home/data/PanCanSC/CRC/GEO/GSE161277/GSE161277_RAW" # temporary? matrix_dir is not specified otherwise so I manually added a path 
     matrix_files = os.listdir(matrix_dir)
 
     # Initialize the AnnData object
