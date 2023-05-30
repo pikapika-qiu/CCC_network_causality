@@ -52,7 +52,7 @@ def load_10X_matrices(matrix_dir):
         # interate through prefixes and index mtx_files        
         for index, prefix in enumerate(prefixes): 
             print("Loading " + prefix)
-            tmp = sc.read_10x_mtx(matrix_dir, prefix = prefix)
+            tmp = sc.read_10x_mtx(matrix_dir, prefix = prefix, cache = True)
             tmp.obs['sample_ID'] = prefix 
             adata_list.append(tmp)
 
