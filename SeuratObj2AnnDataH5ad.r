@@ -19,3 +19,6 @@ my_Seuratobj <- readRDS(Seuratobj_file)
 SaveH5Seurat(my_Seuratobj, filename = "my_Seuratobj.h5Seurat")
 Convert("my_Seuratobj.h5Seurat", dest = "h5ad")
 file.remove("my_Seuratobj.h5Seurat") # Remove the intermediate file to free space
+
+
+my_obj = readRDS("/data/ICI_exprs/EGAS00001004809/1863-counts_cells_cohort1.rds")
