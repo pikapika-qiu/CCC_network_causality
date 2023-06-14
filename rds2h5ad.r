@@ -16,13 +16,12 @@ args <- commandArgs(trailingOnly = TRUE)
         stop("No RDS file provided")
         return(NULL)
     }
-#rds_in <- "/data/ICI_exprs/EGAS00001004809/1863-counts_cells_cohort1.rds"
+rds_in <- "/data/ICI_exprs/GSE179994/GSE179994_all.Tcell.rawCounts.rds"
 print(paste("Reading RDS file:", rds_in))
 rds.obj <- readRDS(rds_in)
 showClass(class(rds.obj))
 
 X <- t(as(rds.obj, "Matrix"))
-
 adata <- AnnData(X = X)
 adata$obs_names <- rds.obj@Dimnames[[2]]
 adata$var_names <- rds.obj@Dimnames[[1]]
