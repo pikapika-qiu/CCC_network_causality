@@ -13,12 +13,10 @@ if (length(args) > 0) {
   stop("No Seurat object provided")
 }
 
+Seuratobj_file <- "/data/ICI_exprs/EGAS00001004809/SCTransform_tcells_cohort1.rds"
 # Load the Seurat object from disk
 my_Seuratobj <- readRDS(Seuratobj_file)
 # Convert the Seurat object to an AnnData file 
-SaveH5Seurat(my_Seuratobj, filename = "my_Seuratobj.h5Seurat")
-Convert("my_Seuratobj.h5Seurat", dest = "h5ad")
+SaveH5Seurat(my_Seuratobj, filename = "/data/ICI_exprs/EGAS00001004809/SCTransform_tcells_cohort1.h5Seurat")
+Convert("/data/ICI_exprs/EGAS00001004809/SCTransform_tcells_cohort1.h5Seurat", dest = "h5ad")
 file.remove("my_Seuratobj.h5Seurat") # Remove the intermediate file to free space
-
-
-my_obj = readRDS("/data/ICI_exprs/EGAS00001004809/1863-counts_cells_cohort1.rds")

@@ -16,7 +16,7 @@ args <- commandArgs(trailingOnly = TRUE)
         stop("No RDS file provided")
         return(NULL)
     }
-rds_in <- "/data/ICI_exprs/GSE179994/GSE179994_all.Tcell.rawCounts.rds"
+rds_in <- "/data/ICI_exprs/TCell_sctransformed_counts.rds"
 print(paste("Reading RDS file:", rds_in))
 rds.obj <- readRDS(rds_in)
 showClass(class(rds.obj))
