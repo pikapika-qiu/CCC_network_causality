@@ -5,13 +5,6 @@
 library(Seurat)
 library(SeuratDisk)
 
-# parse arguments
-args <- commandArgs(trailingOnly = TRUE)
-if (length(args) > 0) {
-  Seuratobj_file <- args[1]
-} else {
-  stop("No Seurat object provided")
-}
 
 Seuratobj_file <- "/data/ICI_exprs/EGAS00001004809/SCTransform_tcells_cohort1.rds"
 # Load the Seurat object from disk
