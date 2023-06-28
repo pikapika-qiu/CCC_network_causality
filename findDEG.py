@@ -9,7 +9,6 @@ def find_cluster_DEGs(adata, cluster_label, condition_key):
     adata_cluster = adata[cluster_mask].copy()
     
     # create pseudo-bulk RNA data for each sample
-    samples = ['pre', 'on']
     bulk_data = {}
     for sample in samples:
         sample_mask = adata_cluster.obs[condition_key] == sample

@@ -43,3 +43,7 @@ cache/home-data-PanCanSC-CRC-GEO-GSE178318-GSE178318_matrix.h5ad
 .gitignore
 Merged_ICI_T_cell_analysis.ipynb
 Merged_ICI_T_cell_analysis.ipynb
+cache/data-ICI_exprs-GSE169246-GSE169246_TNBC_RNA_matrix.h5ad
+cache/home-data-ICI_exprs-GSE169246-GSE169246_TNBC_RNA_matrix.h5ad
+__pycache__/scRNA_utils.cpython-39.pyc
+.gitignore

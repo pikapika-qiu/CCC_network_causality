@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import anndata as ad
+from scRNA_utils import *
 
 
 def load_10X_matrices(matrix_dir):
@@ -134,3 +135,43 @@ def labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden'):
         max_type = max(cell_type_cluster_overlapp_pct, key=cell_type_cluster_overlapp_pct.get)
         print('Cluster ' + str(i) + ' is most likely ' + max_type + ' with ' + str(cell_type_cluster_overlapp_pct[max_type]) + ' overlap')
         adata.obs.loc[cell_in_cls_i, 'cell_type'] = max_type    
+
+    return adata
+
+
+def annData2H5Seurat(adata, output_file):
+    '''
+    This function will save an AnnData object to a H5Seurat file.
+
+    Parameters:
+        adata: AnnData object
+        output_file: the output file name
+
+    Returns:
+        None
+    '''
+
+    # check if adata is AnnData object
+    if not isinstance(adata, ad.AnnData):
+        print ("Input adata is not an AnnData object")
+        return None
+
+    # check if output_file is a string
+    if not isinstance(output_file, str):
+        print ("Input output_file is not a string")
+        return None
+
+    # check if output_file ends with .h5seurat
+    if not output_file.endswith('.h5seurat'):
+        print ("Input output_file does not end with .h5seurat")
+        return None
+
+    # check if output_file already exists
+    if os.path.isfile(output_file):
+        print ("Output file " + output_file + " already exists")
+        return None
+
+
+    # save adata to output_file
+    adata.write(output_file)
+    return None
