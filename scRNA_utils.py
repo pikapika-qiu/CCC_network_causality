@@ -171,7 +171,7 @@ def annData2H5Seurat(adata, output_file):
         print ("Output file " + output_file + " already exists")
         return None
 
-
+    
     # save adata to output_file
     adata.write(output_file)
     return None
