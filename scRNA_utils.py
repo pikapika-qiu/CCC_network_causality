@@ -68,9 +68,6 @@ def clustering_adata(adata):
 
     return adata
 
-def new_func(adata):
-    return not np.all(adata.X > 0)
-
 
 
 def load_10X_matrices(matrix_dir):
