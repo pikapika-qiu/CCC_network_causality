@@ -14,6 +14,64 @@ import scanpy as sc
 import anndata as ad
 from scRNA_utils import *
 
+def clustering_adata(adata):
+    '''
+    This function will cluster an AnnData object 
+
+    Parameters:
+        adata: AnnData object
+
+    Returns:
+        adata: AnnData object with a new column in adata.obs called 'leiden' that contains the cluster label for each cell
+    '''
+
+    # check if adata is AnnData object
+    if not isinstance(adata, ad.AnnData):
+        print ("Input adata is not an AnnData object")
+        return None
+    
+    # check if adata has raw data
+    if adata.raw is None:
+        print ("Input adata does not have raw data")
+        return None
+    
+    # check if adata has more than 1000 cells
+    if adata.shape[0] < 1000:
+        print ("Input adata has less than 1000 cells")
+        return None
+    
+    # check if adata has more than 1000 genes
+    if adata.shape[1] < 1000:
+        print ("Input adata has less than 1000 genes")
+        return None 
+    
+    # check if adata has more than 10000 genes
+    if adata.shape[1] > 10000:
+        # select high veriable genes
+        sc.pp.highly_variable_genes(adata, n_top_genes=2000)
+        # filter adata
+        adata = adata[:, adata.var['highly_variable']]
+
+        # check if X is log transformed
+        if not 'log1p' in adata.layers:
+            sc.pp.normalize_total(adata, target_sum=1e4)
+            sc.pp.log1p(adata, base = 2)
+
+    # run PCA
+    sc.tl.pca(adata, svd_solver='arpack', n_comps=50)   
+    sc.pp.neighbors(adata, n_neighbors=50, n_pcs=50)
+    sc.tl.leiden(adata, resolution=0.5)
+
+    #plot UMAP
+    sc.tl.umap(adata)
+    sc.pl.umap(adata, color=['leiden'], legend_loc='on data', title='leiden')
+
+    return adata
+
+def new_func(adata):
+    return not np.all(adata.X > 0)
+
+
 
 def load_10X_matrices(matrix_dir):
     '''
@@ -139,39 +197,3 @@ def labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden'):
     return adata
 
 
-def annData2H5Seurat(adata, output_file):
-    '''
-    This function will save an AnnData object to a H5Seurat file.
-
-    Parameters:
-        adata: AnnData object
-        output_file: the output file name
-
-    Returns:
-        None
-    '''
-
-    # check if adata is AnnData object
-    if not isinstance(adata, ad.AnnData):
-        print ("Input adata is not an AnnData object")
-        return None
-
-    # check if output_file is a string
-    if not isinstance(output_file, str):
-        print ("Input output_file is not a string")
-        return None
-
-    # check if output_file ends with .h5seurat
-    if not output_file.endswith('.h5seurat'):
-        print ("Input output_file does not end with .h5seurat")
-        return None
-
-    # check if output_file already exists
-    if os.path.isfile(output_file):
-        print ("Output file " + output_file + " already exists")
-        return None
-
-    
-    # save adata to output_file
-    adata.write(output_file)
-    return None
