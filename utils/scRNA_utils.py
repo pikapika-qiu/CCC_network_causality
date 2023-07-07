@@ -194,6 +194,49 @@ def labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden'):
 
     return adata
 
+def find_pseudoBolk_RNA(adata, sample_id_col = None): 
+    '''
+        This function checks if adata and sample id column exists, then group cells from individual samples and produce tpm RNA to find pseudoBolk RNA
+         
+        Parameters:
+            adata: anndata object
+        
+        Returns:
+        
+    '''
+    if not isinstance(adata, ad.AnnData):
+        print ("Input adata is not an AnnData object")
+        return None
+    if not sample_id_col:
+        print ("sample id column not provided")
+        return None
+    # check if adata have sample id col
+    if sample_id_col not in adata.obs.columns:
+        print ("sample id", sample_id_col, "column not available in adata.obs")
+        return None
+    
+    X = np.zeros((len(adata.obs['sample_id'].unique()), len(adata.var_names)))
+    df_obs = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns=['patient_id', 'timepoint', 'batch'])
+    
+    for sample in adata.obs['sample_id'].unique():
+        tpm = np.sum(adata.X[adata.obs['sample_id'] == sample, :], axis=0)
+        tpm = tpm / np.sum(tpm) * 1e6  # Normalize to TPM per cell(check for division by 0)
+        df_tpm.loc[sample, :] = np.log2(tpm + 1) # check
+
+        # Populate df_obs
+        df_obs.loc[sample, 'patient_id'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'patient_id'].unique()[0]
+        df_obs.loc[sample, 'timepoint'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'timepoint'].unique()[0]
+        df_obs.loc[sample, 'batch'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'batch'].unique()[0]
+
+    # Create an AnnData object for the pseudo-bulk RNA data
+    adata_sample_tpm = ad.AnnData(X=X, obs=df_obs, var=adata.var)
+    
+
+    # Perform t-test
+    cluster_data = adata_sample_tpm[adata_sample_tpm.obs[condition_key].isin(['pre', 'on'])]
+    cluster_data.uns["pseudoBulk"] = "log_tpm"
+    
+    return adata_sample_tpm
 
 def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
     '''
@@ -204,11 +247,12 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
         3. Match samples from the same patient.
         4. Perform pairwise t-test between two conditions for each gene.
     '''
-
+    # assume data is already pseudo bulk, check
+    # 
+    
     # Filter cells based on the cluster
     cluster_mask = adata.obs['cluster'] == cluster_label
     adata_cluster = adata[cluster_mask].copy()
-
     # Create pseudo-bulk RNA data for each sample
     bulk_data = {}
     for sample in adata.obs['sample_id'].unique():
@@ -219,28 +263,6 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
 
     # A dictionary to match samples from the same patient under two conditions.
     # Produce a matrix with the following axes: pre/on, N-patients, N-Genes.
-
-    # Loop through all genes
-    # Extract matching pseudo-bulk RNA data for the gene in all patients
-    # Perform pairwise t-test between two conditions for the gene; Check scipy for pair-wise t-test
-    df_tpm = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns=adata.var_names)
-    df_obs = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns=['patient_id', 'timepoint', 'batch'])
-
-    for sample in adata.obs['sample_id'].unique():
-        tpm = np.sum(adata.X[adata.obs['sample_id'] == sample, :], axis=0)
-        tpm = tpm / np.sum(tpm) * 1e6  # Normalize to TPM per cell
-        df_tpm.loc[sample, :] = np.log2(tpm + 1)
-
-        # Populate df_obs
-        df_obs.loc[sample, 'patient_id'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'patient_id'].unique()[0]
-        df_obs.loc[sample, 'timepoint'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'timepoint'].unique()[0]
-        df_obs.loc[sample, 'batch'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'batch'].unique()[0]
-
-    # Create an AnnData object for the pseudo-bulk RNA data
-    adata_sample_tpm = sc.AnnData(X=df_tpm.values, obs=df_obs, var=adata.var)
-
-    # Perform t-test
-    cluster_data = adata_sample_tpm[adata_sample_tpm.obs[condition_key].isin(['pre', 'on'])]
 
     # create list for storing data
     DEGs = []
