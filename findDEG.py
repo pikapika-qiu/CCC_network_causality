@@ -5,56 +5,70 @@ from scipy import stats
 
 def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
     '''
-    This function will find differentially expressed genes between two conditions for a given cluster
+    This function will find differentially expressed genes between two conditions for a given cluster.
     Steps in the process:
-        1. Identify cells from a sample belong to a specific cluster
-        2. Create pseudo-bulk RNA data for each sample
-        3. Match samples from same patient
-        4. Perform pair-wise t-test between two conditions for each gene
-    
-    
+        1. Identify cells from a sample that belong to a specific cluster.
+        2. Create pseudo-bulk RNA data for each sample.
+        3. Match samples from the same patient.
+        4. Perform pairwise t-test between two conditions for each gene.
     '''
-    # filter cells based on cluster
+
+    # Filter cells based on the cluster
     cluster_mask = adata.obs['cluster'] == cluster_label
     adata_cluster = adata[cluster_mask].copy()
-    
-    # create pseudo-bulk RNA data for each sample
+
+    # Create pseudo-bulk RNA data for each sample
     bulk_data = {}
     for sample in adata.obs['sample_id'].unique():
-        # find cells belong to the specific cluster in this sample
-        # produce pseudo-bulk RNA data
-        sample_mask = adata_cluster.obs['sampe_id'] == sample
+        # Find cells that belong to the specific cluster in this sample
+        # Produce pseudo-bulk RNA data
+        sample_mask = adata_cluster.obs['sample_id'] == sample
         bulk_data[sample] = np.array(adata_cluster.X[sample_mask].sum(axis=0)).flatten()
-    
-    # A dictionary match samples from same patient under two conditions
-    # Produce a matrix with the following axis: pre/on, N-patients, N-Genes
 
-    # Loop throught all genes
-    # extract match pseudo-bulk RNA data for the gene in all patients
-    # perform pairwised t-test between two conditions for the gene; Check scipy for pair-wise t-test
-    # 
-    # 
-    #    
-    # create data frames for 'pre' and 'on' matrices
-    pre_df = pd.DataFrame(bulk_data['pre'], columns=['pre'])
-    on_df = pd.DataFrame(bulk_data['on'], columns=['on'])
-    
-    # merge 'pre' and 'on' matrices based on patient ID
-    merged_df = pd.concat([pre_df, on_df], axis=1)
-    
-    # perform t test
-    ttest_results = {}
-    for gene in merged_df.index:
-        pre_values = merged_df.loc[gene, 'pre']
-        on_values = merged_df.loc[gene, 'on']
-        t_statistic, p_value = stats.ttest_rel(pre_values, on_values)
-        ttest_results[gene] = {'t_statistic': t_statistic, 'p_value': p_value}
-    
-    # convert t-test results to a data frame
-    ttest_df = pd.DataFrame.from_dict(ttest_results, orient='index')
-    
-    # filter?
-    significant_DEGs = ttest_df[ttest_df['p_value'] < 0.05]
-    
-    return significant_DEGs
+    # A dictionary to match samples from the same patient under two conditions.
+    # Produce a matrix with the following axes: pre/on, N-patients, N-Genes.
 
+    # Loop through all genes
+    # Extract matching pseudo-bulk RNA data for the gene in all patients
+    # Perform pairwise t-test between two conditions for the gene; Check scipy for pair-wise t-test
+    df_tpm = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns=adata.var_names)
+    df_obs = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns=['patient_id', 'timepoint', 'batch'])
+
+    for sample in adata.obs['sample_id'].unique():
+        tpm = np.sum(adata.X[adata.obs['sample_id'] == sample, :], axis=0)
+        tpm = tpm / np.sum(tpm) * 1e6  # Normalize to TPM per cell
+        df_tpm.loc[sample, :] = np.log2(tpm + 1)
+
+        # Populate df_obs
+        df_obs.loc[sample, 'patient_id'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'patient_id'].unique()[0]
+        df_obs.loc[sample, 'timepoint'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'timepoint'].unique()[0]
+        df_obs.loc[sample, 'batch'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'batch'].unique()[0]
+
+    # Create an AnnData object for the pseudo-bulk RNA data
+    adata_sample_tpm = sc.AnnData(X=df_tpm.values, obs=df_obs, var=adata.var)
+
+    # Perform t-test
+    cluster_data = adata_sample_tpm[adata_sample_tpm.obs[condition_key].isin(['pre', 'on'])]
+
+    # create list for storing data
+    DEGs = []
+
+    # looping through var names
+    for gene in cluster_data.var_names:
+        gene_data = cluster_data[:, gene]
+
+        # split data into two conditions
+        pre_data = gene_data[gene_data.obs[condition_key] == 'pre']
+        on_data = gene_data[gene_data.obs[condition_key] == 'on']
+
+        # perform t-test using scipy
+        t_stat, p_value = stats.ttest_ind(pre_data.X, on_data.X)
+
+        # store statistics in a dict
+        gene_stats[gene] = {'t_stat': t_stat, 'p_value': p_value}
+
+        # check if differentially expressed
+        if np.abs(t_stat) > 0:
+            DEGs.append(gene)
+
+    return DEGs
