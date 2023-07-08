@@ -110,7 +110,7 @@ def load_10X_matrices(matrix_dir):
         for index, prefix in enumerate(prefixes): 
             print("Loading " + prefix)
             tmp = sc.read_10x_mtx(matrix_dir, prefix = prefix, cache = True)
-            tmp.obs['sample_ID'] = prefix 
+            tmp.obs[sample_id_col] = prefix 
             adata_list.append(tmp)
 
         # concatenate adata_list
@@ -194,47 +194,64 @@ def labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden'):
 
     return adata
 
-def find_pseudoBolk_RNA(adata, sample_id_col = None): 
-    '''
-        This function checks if adata and sample id column exists, then group cells from individual samples and produce tpm RNA to find pseudoBolk RNA
+def scRNA2PseudoBulkAnnData(adata, sample_id_col = None): 
+    '''        
+        This function convert a scRNA AnnData oboject to an AnnData object,
+           where gene expression from the same sample is merged and normalized as 
+           transcript per million (TPM) format.  
          
         Parameters:
             adata: anndata object
+            sample_id_col: the column in adata.obs that contains the sample id
         
         Returns:
+            adata: AnnData object with adata.X in TPM format
         
     '''
+    # check if input adata is AnnData object
     if not isinstance(adata, ad.AnnData):
         print ("Input adata is not an AnnData object")
         return None
     if not sample_id_col:
         print ("sample id column not provided")
         return None
+    
     # check if adata have sample id col
     if sample_id_col not in adata.obs.columns:
         print ("sample id", sample_id_col, "column not available in adata.obs")
         return None
     
-    X = np.zeros((len(adata.obs['sample_id'].unique()), len(adata.var_names)))
-    df_obs = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns=['patient_id', 'timepoint', 'batch'])
-    
+    # check if adata have raw data
+    if not adata.raw:
+        print ("adata.raw is not available")
+        return None
+
+    col_to_remove = ['ncount_rna', 'nfeature_rna', 'total_counts', 'total_counts_mt', 'pct_counts_mt', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'total_counts_mt', 'pct_counts_mt', 'n_genes_by_counts', 'log1p_n_genes_by_counts']
+    col_to_keep_in_obs = [x for x in adata.obs.columns.str.lower() if x not in col_to_remove]
+
+    nSamples = len(adata.obs['sample_id'].unique()) 
+    nGenes = len(adata.var_names)
+    X = np.zeros((nSamples, nGenes), dtype=np.float32)
+    df_tpm = pd.DataFrame(X, index=adata.obs['sample_id'].unique(), columns = adata.var_names)
+
+    # remove obs columns that are added by sc.pp functions
+    col_to_remove = ['ncount_rna', 'nfeature_rna', 'total_counts', 'total_counts_mt', 'pct_counts_mt', 'n_genes_by_counts', 'log1p_n_genes_by_counts', 'total_counts', 'total_counts_mt', 'pct_counts_mt', 'n_genes_by_counts', 'log1p_n_genes_by_counts']
+    col_to_keep_in_obs = [x for x in adata.obs.columns.str.lower() if x not in col_to_remove]
+    df_obs = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns = col_to_keep_in_obs)
+
     for sample in adata.obs['sample_id'].unique():
-        tpm = np.sum(adata.X[adata.obs['sample_id'] == sample, :], axis=0)
-        tpm = tpm / np.sum(tpm) * 1e6  # Normalize to TPM per cell(check for division by 0)
-        df_tpm.loc[sample, :] = np.log2(tpm + 1) # check
+        tpm = np.sum(adata.X[adata.obs['sample_id'] == sample, :], axis = 0)
+        tpm = np.array(tpm / np.sum(tpm) * 1e6, dtype=np.float32) # normalize to TPM/per cell and force to float32
+        df_tpm.loc[sample,:] = np.log2(tpm + 1)
 
         # Populate df_obs
-        df_obs.loc[sample, 'patient_id'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'patient_id'].unique()[0]
-        df_obs.loc[sample, 'timepoint'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'timepoint'].unique()[0]
-        df_obs.loc[sample, 'batch'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'batch'].unique()[0]
+        for col in adata.obs.columns:
+            df_obs.loc[sample, col] = adata.obs.loc[adata.obs[sample_id_col] == sample, col].unique()[0]
+ 
 
     # Create an AnnData object for the pseudo-bulk RNA data
-    adata_sample_tpm = ad.AnnData(X=X, obs=df_obs, var=adata.var)
-    
-
-    # Perform t-test
-    cluster_data = adata_sample_tpm[adata_sample_tpm.obs[condition_key].isin(['pre', 'on'])]
-    cluster_data.uns["pseudoBulk"] = "log_tpm"
+    adata_sample_tpm = ad.AnnData(df_tpm.values, obs=df_obs, var=adata.var)
+    adata_sample_tpm.uns["pseudoBulk"] = "log_2_tpm"
     
     return adata_sample_tpm
 
@@ -255,10 +272,10 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
     adata_cluster = adata[cluster_mask].copy()
     # Create pseudo-bulk RNA data for each sample
     bulk_data = {}
-    for sample in adata.obs['sample_id'].unique():
+    for sample in adata.obs[sample_id_col].unique():
         # Find cells that belong to the specific cluster in this sample
         # Produce pseudo-bulk RNA data
-        sample_mask = adata_cluster.obs['sample_id'] == sample
+        sample_mask = adata_cluster.obs[sample_id_col] == sample
         bulk_data[sample] = np.array(adata_cluster.X[sample_mask].sum(axis=0)).flatten()
 
     # A dictionary to match samples from the same patient under two conditions.
