@@ -13,8 +13,9 @@ import pandas as pd
 import scanpy as sc
 import anndata as ad
 from scRNA_utils import *
+from scipy import stats
 
-def clustering_adata(adata, n_top_genes=2000, n_neighbors=50, n_pcs=50, resolution=0.5, cell_type_markers=None):
+def clustering_adata(adata):
     '''
     This function will cluster an AnnData object 
 
@@ -58,62 +59,17 @@ def clustering_adata(adata, n_top_genes=2000, n_neighbors=50, n_pcs=50, resoluti
             sc.pp.log1p(adata, base = 2)
 
     # run PCA
-    sc.tl.pca(adata, svd_solver='arpack', n_comps=n_pcs)   
-    sc.pp.neighbors(adata, n_neighbors=n_neighbors, n_pcs=n_pcs)
-    sc.tl.leiden(adata, resolution=resolution)
+    sc.tl.pca(adata, svd_solver='arpack', n_comps=50)   
+    sc.pp.neighbors(adata, n_neighbors=50, n_pcs=50)
+    sc.tl.leiden(adata, resolution=0.5)
 
     #plot UMAP
     sc.tl.umap(adata)
     sc.pl.umap(adata, color=['leiden'], legend_loc='on data', title='leiden')
 
-    # label clusters with cell type
-    if cell_type_markers is not None:
-        # drop cell_type column if it exists
-        if 'cell_type' in adata.obs.columns:
-            adata.obs.drop(columns=['cell_type'], inplace=True)
-        labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden') 
-
     return adata
 
-def harmonyIntegration(adata, batch_column='treatment', n_top_genes=2000, n_neighbors=50, n_pcs=50, resolution=0.5, cell_type_markers=None):    
-    '''
-    This function will integrate multiple AnnData objects using Harmony
 
-    Parameters:
-        adata: AnnData object
-        batch_column: the column in adata.obs that contains the batch labels
-
-    Returns:
-        adata: AnnData object with a UMAP coordinate and PCA coordinate.
-        A new column in adata.obs called 'leiden' that contains the cluster label for each cell
-    ''' 
-    # check if adata is AnnData object
-    if not isinstance(adata, ad.AnnData):
-        print ("Input adata is not an AnnData object")
-        return None
-    #check if adata has raw data
-    if adata.raw is None:
-        print ("Input adata does not have raw data")
-        return None
-    
-    # check if batch_column is in adata.obs
-    if not batch_column in adata.obs.columns:
-        print ("Input batch_column is not in adata.obs")
-        return None
-    
-    # check if adata has more than 1000 cells
-    if adata.shape[0] < 1000:
-        print ("Input adata has less than 1000 cells")
-        return None
-    
-    # check if adata has more than 1000 genes
-    if adata.raw.shape[1] < 1000:
-        print ("Input adata has less than 1000 genes")
-        return None
-    
-    # apply harmony integration to adata.raw
-    sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
-    
 
 def load_10X_matrices(matrix_dir):
     '''
@@ -237,5 +193,99 @@ def labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden'):
         adata.obs.loc[cell_in_cls_i, 'cell_type'] = max_type    
 
     return adata
+
+def find_pseudoBolk_RNA(adata, sample_id_col = None): 
+    '''
+        This function checks if adata and sample id column exists, then group cells from individual samples and produce tpm RNA to find pseudoBolk RNA
+         
+        Parameters:
+            adata: anndata object
+        
+        Returns:
+        
+    '''
+    if not isinstance(adata, ad.AnnData):
+        print ("Input adata is not an AnnData object")
+        return None
+    if not sample_id_col:
+        print ("sample id column not provided")
+        return None
+    # check if adata have sample id col
+    if sample_id_col not in adata.obs.columns:
+        print ("sample id", sample_id_col, "column not available in adata.obs")
+        return None
+    
+    X = np.zeros((len(adata.obs['sample_id'].unique()), len(adata.var_names)))
+    df_obs = pd.DataFrame(index=adata.obs['sample_id'].unique(), columns=['patient_id', 'timepoint', 'batch'])
+    
+    for sample in adata.obs['sample_id'].unique():
+        tpm = np.sum(adata.X[adata.obs['sample_id'] == sample, :], axis=0)
+        tpm = tpm / np.sum(tpm) * 1e6  # Normalize to TPM per cell(check for division by 0)
+        df_tpm.loc[sample, :] = np.log2(tpm + 1) # check
+
+        # Populate df_obs
+        df_obs.loc[sample, 'patient_id'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'patient_id'].unique()[0]
+        df_obs.loc[sample, 'timepoint'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'timepoint'].unique()[0]
+        df_obs.loc[sample, 'batch'] = adata.obs.loc[adata.obs['sample_id'] == sample, 'batch'].unique()[0]
+
+    # Create an AnnData object for the pseudo-bulk RNA data
+    adata_sample_tpm = ad.AnnData(X=X, obs=df_obs, var=adata.var)
+    
+
+    # Perform t-test
+    cluster_data = adata_sample_tpm[adata_sample_tpm.obs[condition_key].isin(['pre', 'on'])]
+    cluster_data.uns["pseudoBulk"] = "log_tpm"
+    
+    return adata_sample_tpm
+
+def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
+    '''
+    This function will find differentially expressed genes between two conditions for a given cluster.
+    Steps in the process:
+        1. Identify cells from a sample that belong to a specific cluster.
+        2. Create pseudo-bulk RNA data for each sample.
+        3. Match samples from the same patient.
+        4. Perform pairwise t-test between two conditions for each gene.
+    '''
+    # assume data is already pseudo bulk, check
+    # 
+    
+    # Filter cells based on the cluster
+    cluster_mask = adata.obs['cluster'] == cluster_label
+    adata_cluster = adata[cluster_mask].copy()
+    # Create pseudo-bulk RNA data for each sample
+    bulk_data = {}
+    for sample in adata.obs['sample_id'].unique():
+        # Find cells that belong to the specific cluster in this sample
+        # Produce pseudo-bulk RNA data
+        sample_mask = adata_cluster.obs['sample_id'] == sample
+        bulk_data[sample] = np.array(adata_cluster.X[sample_mask].sum(axis=0)).flatten()
+
+    # A dictionary to match samples from the same patient under two conditions.
+    # Produce a matrix with the following axes: pre/on, N-patients, N-Genes.
+
+    # create list for storing data
+    DEGs = []
+
+    # looping through var names
+    for gene in cluster_data.var_names:
+        gene_data = cluster_data[:, gene]
+
+        # split data into two conditions
+        pre_data = gene_data[gene_data.obs[condition_key] == 'pre']
+        on_data = gene_data[gene_data.obs[condition_key] == 'on']
+
+        # perform t-test using scipy
+        t_stat, p_value = stats.ttest_ind(pre_data.X, on_data.X)
+
+        # store statistics in a dict
+        gene_stats[gene] = {'t_stat': t_stat, 'p_value': p_value}
+
+        # check if differentially expressed
+        if np.abs(t_stat) > 0:
+            DEGs.append(gene)
+
+    return DEGs
+
 
 
