@@ -15,7 +15,7 @@ import anndata as ad
 from scRNA_utils import *
 from scipy import stats
 
-def clustering_adata(adata):
+def clustering_adata(adata, n_top_genes=2000, n_neighbors=50, n_pcs=50, resolution=0.5, cell_type_markers=None):
     '''
     This function will cluster an AnnData object 
 
@@ -59,17 +59,62 @@ def clustering_adata(adata):
             sc.pp.log1p(adata, base = 2)
 
     # run PCA
-    sc.tl.pca(adata, svd_solver='arpack', n_comps=50)   
-    sc.pp.neighbors(adata, n_neighbors=50, n_pcs=50)
-    sc.tl.leiden(adata, resolution=0.5)
+    sc.tl.pca(adata, svd_solver='arpack', n_comps=n_pcs)   
+    sc.pp.neighbors(adata, n_neighbors=n_neighbors, n_pcs=n_pcs)
+    sc.tl.leiden(adata, resolution=resolution)
 
     #plot UMAP
     sc.tl.umap(adata)
     sc.pl.umap(adata, color=['leiden'], legend_loc='on data', title='leiden')
 
+    # label clusters with cell type
+    if cell_type_markers is not None:
+        # drop cell_type column if it exists
+        if 'cell_type' in adata.obs.columns:
+            adata.obs.drop(columns=['cell_type'], inplace=True)
+        labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden') 
+
     return adata
 
+def harmonyIntegration(adata, batch_column='treatment', n_top_genes=2000, n_neighbors=50, n_pcs=50, resolution=0.5, cell_type_markers=None):    
+    '''
+    This function will integrate multiple AnnData objects using Harmony
 
+    Parameters:
+        adata: AnnData object
+        batch_column: the column in adata.obs that contains the batch labels
+
+    Returns:
+        adata: AnnData object with a UMAP coordinate and PCA coordinate.
+        A new column in adata.obs called 'leiden' that contains the cluster label for each cell
+    ''' 
+    # check if adata is AnnData object
+    if not isinstance(adata, ad.AnnData):
+        print ("Input adata is not an AnnData object")
+        return None
+    #check if adata has raw data
+    if adata.raw is None:
+        print ("Input adata does not have raw data")
+        return None
+    
+    # check if batch_column is in adata.obs
+    if not batch_column in adata.obs.columns:
+        print ("Input batch_column is not in adata.obs")
+        return None
+    
+    # check if adata has more than 1000 cells
+    if adata.shape[0] < 1000:
+        print ("Input adata has less than 1000 cells")
+        return None
+    
+    # check if adata has more than 1000 genes
+    if adata.raw.shape[1] < 1000:
+        print ("Input adata has less than 1000 genes")
+        return None
+    
+    # apply harmony integration to adata.raw
+    sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
+    
 
 def load_10X_matrices(matrix_dir):
     '''
