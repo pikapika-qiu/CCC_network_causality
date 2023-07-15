@@ -14,7 +14,7 @@ import anndata as ad
 from scRNA_utils import *
 from scipy import stats
 
-def clustering_adata(adata):
+def clustering_adata(adata, resolution = 0.5):
     '''
     This function will cluster an AnnData object 
 
@@ -60,7 +60,7 @@ def clustering_adata(adata):
     # run PCA
     sc.tl.pca(adata, svd_solver='arpack', n_comps=50)   
     sc.pp.neighbors(adata, n_neighbors=50, n_pcs=50)
-    sc.tl.leiden(adata, resolution=0.5)
+    sc.tl.leiden(adata, resolution=resolution)
 
     #plot UMAP
     sc.tl.umap(adata)
@@ -253,10 +253,10 @@ def scRNA2PseudoBulkAnnData(adata, sample_id_col = None):
     adata_sample_tpm = ad.AnnData(df_tpm.values, obs=df_obs, var=adata.var)
     adata_sample_tpm.uns["pseudoBulk"] = "tpm"
     adata_sample_tpm.raw = adata_sample_tpm
-    
+
     return adata_sample_tpm
 
-def pairwise_ttest(adata, condition_key = None, sample_id_col = None, patient_id_col = None, pval_cutoff = 0.05, log2fc_cutoff = 1):
+def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_col = None, pval_cutoff = 0.05, log2fc_cutoff = 1):
     '''
     This function is to find the genes or gene modules that are differentially expression
     between two conditions collected from a same subject, e.g., tumor-vs-normal or before or after a 
@@ -348,6 +348,12 @@ def pairwise_ttest(adata, condition_key = None, sample_id_col = None, patient_id
         res_df.loc[gene_name, 'mean_condition1'] = mean_condition1
         res_df.loc[gene_name, 'mean_condition2'] = mean_condition2
 
+    # estimate q-value based on p-value        
+    qvalue = importr('qvalue')
+    r_p_values = robjects.FloatVector(res_df['pval'])
+    r_q_values = qvalue.qvalue(r_p_values)
+    res_df['qval'] = np.array(r_q_values.rx2('qvalues'))
+
     return res_df
 
 
@@ -400,5 +406,29 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
 
     return DEGs
 
+def findDEGs(adata, cluster_id, condition_col,  method = 'Wilcoxon'):
+    pass
+'''
+   We want to find genes that are differentially expressed between cells from common cluster but collected
+    under different conditions from a study. 
+    
+    The input is adata, which is a scRNA-seq data with the following structure:
+    adata.obs:
+      - sample_id: sample id
+      - cluster_id: cluster label for cell to be examined.  For example cells belonging to a specific T cell cluster
+      _ condition: The conditions under which cells are collected and to be compared. 
 
-
+    Parameters:
+       adata
+       cluster_id: a list of two cluster labels
+       condition_col: the column name in adata.obs that contains the condition information
+       method: 'Wilcoxon' or 't-test'
+    
+    Return:
+     a list of DEGs
+    
+'''
+    # Steps:
+    # 1. Filter cells based on the cluster --> adata object containing cells from the two clusters
+    # 2. call rank_genes_groups with the two clusters as groups with method = 'wilcoxon'
+    # 3. extract the list of DEGs
