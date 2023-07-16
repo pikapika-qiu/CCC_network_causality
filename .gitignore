@@ -178,3 +178,6 @@ hello.cu
 test-paired-ttest.ipynb
 utils/__pycache__/scRNA_utils.cpython-39.pyc
 utils/__pycache__/scRNA_utils.cpython-310.pyc
+utils/__pycache__/scRNA_utils.cpython-39.pyc
+__pycache__/load_10X_matrices.cpython-310.pyc
+utils/__pycache__/scRNA_utils.cpython-39.pyc

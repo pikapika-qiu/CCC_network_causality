@@ -60,11 +60,11 @@ def clustering_adata(adata, resolution = 0.5):
     # run PCA
     sc.tl.pca(adata, svd_solver='arpack', n_comps=50)   
     sc.pp.neighbors(adata, n_neighbors=50, n_pcs=50)
-    sc.tl.leiden(adata, resolution=resolution)
+    sc.tl.leiden(adata, resolution = resolution)
 
     #plot UMAP
-    sc.tl.umap(adata)
-    sc.pl.umap(adata, color=['leiden'], legend_loc='on data', title='leiden')
+    # sc.tl.umap(adata)
+    # sc.pl.umap(adata, color=['leiden'], legend_loc='on data', title='leiden')
 
     return adata
 
