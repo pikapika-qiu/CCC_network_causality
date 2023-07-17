@@ -193,6 +193,58 @@ def labelClusterWithCellType(adata, cell_type_markers, cluster_column='leiden'):
 
     return adata
 
+def analyze_cell_type(adata, cell_type, markers, adata_name):
+    '''
+    this function should automatically extract a desired cell type for the user to save to a .h5ad file.  
+
+    cell_type: the type of cell you wish to extract ("T cell" or "Myeloid", etc)
+    markers: a dictionary of cell markers for the desired cell type, provided by the user 
+    adata_name: as this makes a copy of adata, provide what you would like the copy to be named (ex: "adata_T")
+    '''
+
+    # set Scanpy plotting parameters
+    sc.set_figure_params()
+
+    # make a copy of adata
+    adata = adata.copy()
+
+    # extract cells and create a new AnnData object
+    adata_type = adata[adata.obs['cell_type'] == cell_type].copy()
+
+    # restore the X to the original raw.X for re-processing
+    adata_type = ad.AnnData(X=adata_type.raw.X, obs=adata_type.obs, var=adata_type.raw.var, obsm=adata_type.obsm, uns=adata_type.uns)
+    adata_type.raw = adata_type
+    print(str(adata_type.shape))
+
+    # re-calculate highly variable genes
+    sc.pp.highly_variable_genes(adata_type, min_mean=0.0125, max_mean=3, min_disp=0.5)
+    sc.pl.highly_variable_genes(adata_type)
+    len(adata_type.var_names)
+
+    # re-cluster the specified cell type
+    sc.tl.pca(adata_type, svd_solver='arpack', n_comps=40)
+    sc.pp.neighbors(adata_type, n_neighbors=80, n_pcs=40)
+    sc.tl.leiden(adata_type, resolution=.5)
+    
+    sc.tl.umap(adata_type)
+    sc.pl.umap(adata_type, color='leiden', legend_loc='on data')
+
+    
+
+    # apply cell type labels using the marker dictionary
+    adata_type.obs.drop(columns="cell_type", inplace=True)
+    labelClusterWithCellType(adata_type, markers, cluster_column='leiden')
+
+    # UMAP
+    sc.pl.umap(adata_type, color='cell_type')
+
+    # more UMAPs
+    sc.pl.umap(adata_type, color=['timepoint', 'cell_type'])
+
+    # save a copy of adata_type under custom name
+    globals()[adata_name] = adata_type
+
+
 def scRNA2PseudoBulkAnnData(adata, sample_id_col = None): 
     '''        
         This function convert a scRNA AnnData oboject to an AnnData object,
@@ -304,8 +356,8 @@ def pairwise_ttest(adata, condition_key = None, sample_id_col = None, patient_id
         return None
     
     # assume data is already pseudo bulk, check
-    if not adata.uns["pseudoBulk"] :
-        print ("Input adata is not pseudo-bulk RNA data. Convert to pseudo-bulk RNA data.")
+    if 'pseudoBulk' in adata.uns.keys():
+        print ("Input adata is in pseudo-bulk RNA data. Convert to pseudo-bulk RNA data.")
         adata = scRNA2PseudoBulkAnnData(adata, sample_id_col=sample_id_col)
     
     # Create a 3-d matrix, one dimension is the patient, the other is the gene, the third is the condition
