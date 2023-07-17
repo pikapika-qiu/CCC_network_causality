@@ -458,11 +458,11 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
 
     return DEGs
 
-def findDEGs(adata, cluster_id, condition_col,  method = 'Wilcoxon'):
+def findDEGs(adata, cluster_id, condition_col, cluster_id_col = 'leiden', method = 'wilcoxon'):
     #pass
 '''
-   We want to find genes that are differentially expressed between cells from common cluster but collected
-    under different conditions from a study. 
+   We want to find genes that are differentially expressed between cells from a cluster but collected
+    under different conditions from a study. Assume cluster_id col is contained in the leiden col.
     
     The input is adata, which is a scRNA-seq data with the following structure:
     adata.obs:
@@ -472,8 +472,9 @@ def findDEGs(adata, cluster_id, condition_col,  method = 'Wilcoxon'):
 
     Parameters:
        adata
-       cluster_id: a list of two cluster labels
-       condition_col: the column name in adata.obs that contains the condition information
+       cluster_id: a scalar(leiden: string) of the interested cluster labels
+       condition_col: the column name in adata.obs that contains the conditions information
+       cluster_id_col: the column is contianed in the leiden column(cluster ids)
        method: 'Wilcoxon' or 't-test'
     
     Return:
@@ -482,11 +483,15 @@ def findDEGs(adata, cluster_id, condition_col,  method = 'Wilcoxon'):
 '''
     # Steps/pseudocode:
     # 1. Filter cells based on the cluster --> adata object containing cells from the two clusters
-    cluster_1, cluster_2 = cluster_id
-    adata_subset = adata[adata.obs[condition_col].isin([cluster_1, cluster_2])].copy()
+    # subset = cluster_id
+    adata_subset = adata[adata.obs[cluster_id_col]==cluster_id,:].copy()
     
-    # 2. call rank_genes_groups with the two clusters as groups with method = 'wilcoxon'
-    sc.tl.rank_genes_groups(adata_subset, groupby=condition_col, groups=[cluster_1, cluster_2], method='wilcoxon')
+    # determine the rank of each gene in a given cell.  That is, we need find a function in python which determines rank of of a gene
+    #  in a row and put the rank-order value in place.  # 2. call rank_genes_groups with the two clusters as groups with method = 'wilcoxon'
+    # condition/treatment col
+    gene_ranks = np.argsort(adata_subset.X, axis=1)
+    unique_conditions = adata_subset.obs[condition_col].unique()
+    sc.tl.rank_genes_groups(adata_subset, groupby= condition_col , groups=unique_conditions, method=method)
     
     # 3. extract the list of DEGs
     result = adata_subset.uns['rank_genes_groups']
