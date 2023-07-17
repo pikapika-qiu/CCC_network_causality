@@ -407,7 +407,7 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
     return DEGs
 
 def findDEGs(adata, cluster_id, condition_col,  method = 'Wilcoxon'):
-    pass
+    #pass
 '''
    We want to find genes that are differentially expressed between cells from common cluster but collected
     under different conditions from a study. 
@@ -428,7 +428,16 @@ def findDEGs(adata, cluster_id, condition_col,  method = 'Wilcoxon'):
      a list of DEGs
     
 '''
-    # Steps:
+    # Steps/pseudocode:
     # 1. Filter cells based on the cluster --> adata object containing cells from the two clusters
+    cluster_1, cluster_2 = cluster_id
+    adata_subset = adata[adata.obs[condition_col].isin([cluster_1, cluster_2])].copy()
+    
     # 2. call rank_genes_groups with the two clusters as groups with method = 'wilcoxon'
+    sc.tl.rank_genes_groups(adata_subset, groupby=condition_col, groups=[cluster_1, cluster_2], method='wilcoxon')
+    
     # 3. extract the list of DEGs
+    result = adata_subset.uns['rank_genes_groups']
+    de_genes = result['names'][condition_col][cluster_2]
+    
+    return de_genes.tolist()
