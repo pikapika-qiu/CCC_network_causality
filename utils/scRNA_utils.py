@@ -497,10 +497,10 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
     adata_cluster = adata[cluster_mask].copy()
     # Create pseudo-bulk RNA data for each sample
     bulk_data = {}
-    for sample in adata.obs[sample_id_col].unique():
+    for sample in adata.obs['sample_id'].unique():
         # Find cells that belong to the specific cluster in this sample
         # Produce pseudo-bulk RNA data
-        sample_mask = adata_cluster.obs[sample_id_col] == sample
+        sample_mask = adata_cluster.obs['sample_id'] == sample
         bulk_data[sample] = np.array(adata_cluster.X[sample_mask].sum(axis=0)).flatten()
 
     # A dictionary to match samples from the same patient under two conditions.
@@ -514,8 +514,8 @@ def find_cluster_DEGs_pairwise(adata, cluster_label, condition_key):
         gene_data = cluster_data[:, gene]
 
         # split data into two conditions
-        pre_data = gene_data[gene_data.obs[condition_key] == 'pre']
-        on_data = gene_data[gene_data.obs[condition_key] == 'on']
+        pre_data = gene_data[gene_data.obs[condition_key] == 'Pre']
+        on_data = gene_data[gene_data.obs[condition_key] == 'On']
 
         # perform t-test using scipy
         t_stat, p_value = stats.ttest_ind(pre_data.X, on_data.X)
