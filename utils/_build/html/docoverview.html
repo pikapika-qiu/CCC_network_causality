@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>scRNA_utils Function API Documentation</title>
+</head>
+<body>
+    <h1>Function API Documentation</h1>
+
+    <h2>clustering_adata</h2>
+    <p>
+        This function will cluster an AnnData object.
+    </p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><code>adata</code>: AnnData object</li>
+    </ul>
+    <p><strong>Returns:</strong></p>
+    <ul>
+        <li><code>adata</code>: AnnData object with a new column in adata.obs called 'leiden' that contains the cluster label for each cell</li>
+    </ul>
+
+    <h2>load_10X_matrices</h2>
+    <p>
+        This function will load a fold of 10X matrix files into a single sparse matrix.
+    </p>
+    <p><strong>Parameters:</strong></p>
+    <ul>
+        <li><code>matrix_dir</code> (str): The directory containing the 10X matrix files.</li>
+    </ul>
+    <p><strong>Returns:</strong></p>
+    <ul>
+        <li>A single AnnData object containing the concatenated matrices.</li>
+    </ul>
+
+    <!-- Repeat the above structure for each function -->
+
+</body>
+</html>
