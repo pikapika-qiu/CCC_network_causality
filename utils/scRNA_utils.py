@@ -141,8 +141,6 @@ def clustering_adata(adata, resolution = 0.5):
 
     return adata
 
-
-
 def load_10X_matrices(matrix_dir):
     '''
     load_10X_matrices(matrix_dir)
