@@ -576,3 +576,33 @@ def findDEGs(adata, cluster_id, condition_col, cluster_id_col = 'leiden', method
     # de_genes = result['names'][condition_col][cluster_2]
     
     # return de_genes.tolist()
+    
+def performDEG(adata, groupby, group1 = 'pre', group2 = 'on'):
+    """
+    Perform differential expression analysis between two clusters in an AnnData object
+
+    Parameters:
+        adata (scanpy.AnnData)
+        groupby (str): Key in `adata.obs` 
+        group1 (str): Name of the first group to contrast, default 'pre'
+        group2 (str): Name of the second group to contrast, default 'on'
+
+    Returns:
+        pandas.DataFrame
+    """
+
+    # Identify clusters
+    sc.tl.louvain(adata)
+
+    # Perform differential expression analysis between two clusters
+    sc.tl.rank_sum_test(adata, groupby=groupby, groups=[group1, group2])
+
+    # Access the results
+    result = adata.uns['rank_sum_test']
+    groups_df = result['gene_names'][result['reject']]  # Differentially expressed genes
+    
+    return groups_df
+
+# Example usage:
+# Assuming you have already loaded and preprocessed your AnnData object as 'adata'
+# diff_genes = performDEG(adata, groupby='louvain', group1='cluster_1', group2='cluster_2')
