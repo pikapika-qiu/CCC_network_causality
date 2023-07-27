@@ -87,7 +87,7 @@ def parseNHDP_RData(file_name):
     GEM_by_gene_adata = ad.AnnData(X=centroids_mat, obs=pd.DataFrame(index=genes), var=pd.DataFrame(index=range(centroids_mat.shape[1])))
     return {'cell_by_GEM': cell_by_GEM_adata, 'GEM_by_gene': GEM_by_gene_adata}
 
-def clustering_adata(adata, resolution = 0.5):
+def clustering_adata(adata, resolution = 0.5, n_top_genes=5000):
     '''
     This function will cluster an AnnData object 
 
@@ -118,10 +118,10 @@ def clustering_adata(adata, resolution = 0.5):
         print ("Input adata has less than 1000 genes")
         return None 
     
-    # check if adata has more than 10000 genes
-    if adata.shape[1] > 15000:
+    # check if adata has already been through selection of high variance genes
+    if not 'highly_variable' in adata.var.columns:
         # select high veriable genes
-        sc.pp.highly_variable_genes(adata, n_top_genes=5000)
+        sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
         # filter adata
         adata = adata[:, adata.var['highly_variable']]
 
