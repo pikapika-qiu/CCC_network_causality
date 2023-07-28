@@ -24,7 +24,7 @@ def plotGEMs(adata, cluster_id_col, cluster_id_to_plot, ncols=4):
     Parameters:
         adata: AnnData object
         cluster_id_col: column name in adata.obs that contains the cluster id
-        cluster_id_to_plot: cluster id to plot
+        cluster_id_to_plot: A list of cluster ids to plot
         ncols: number of columns in the plot
     '''
 
@@ -433,6 +433,9 @@ def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_co
     nPatients = len(adata.obs[patient_id_col].unique())
     nGenes = len(adata.var_names)
     nConditions = len(adata.obs[condition_key].unique())
+    if nConditions != 2:
+        print ("Number of conditions is not 2")
+        return None
     X = np.zeros((nConditions, nPatients, nGenes), dtype=np.float32)
 
     res_df = pd.DataFrame(index=adata.var_names, columns = ['pval', 'log2fc', 'mean_condition1', 'mean_condition2'])
@@ -606,3 +609,31 @@ def performDEG(adata, groupby, group1 = 'pre', group2 = 'on'):
 # Example usage:
 # Assuming you have already loaded and preprocessed your AnnData object as 'adata'
 # diff_genes = performDEG(adata, groupby='louvain', group1='cluster_1', group2='cluster_2')
+
+
+def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condition_2 = None):
+    '''
+    This function search for clusters and then find DEGs with each clusters conditioning on specifid conditons.
+
+    Parameters
+    --------
+    adata: AnnData object
+        Annotated data matrix with rows for cells and columns for genes.
+    condition_col: the column name of the condition in the adata.obs
+    condition_1: the condition_1    
+    condition_2: the condition_2
+
+    Returns:
+    --------
+    DEGs: A dataframe with DEGs and their logFC, pval, pval_adj, etc.
+
+
+    pseudocode:
+    1. find clusters by call leiden or louvian by clustering_adata function
+    2. loop through each cluster:
+        2.1. extract cells belonging to the cluster (adata.copy())
+        2.2. Call paird_ttest funciton using the adata_cluster find DEGs conditioning on the condition_1 and condition_2
+        2.2. return the dataframe of DEGs
+    '''
+    pass 
+
