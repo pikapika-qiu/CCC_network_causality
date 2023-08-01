@@ -611,7 +611,7 @@ def performDEG(adata, groupby, group1 = 'pre', group2 = 'on'):
 # diff_genes = performDEG(adata, groupby='louvain', group1='cluster_1', group2='cluster_2')
 
 
-def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condition_2 = None):
+def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condition_2 = None, top_n_degs=20):
     '''
     This function search for clusters and then find DEGs with each clusters conditioning on specifid conditons.
 
@@ -635,5 +635,45 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
         2.2. Call paird_ttest funciton using the adata_cluster find DEGs conditioning on the condition_1 and condition_2
         2.2. return the dataframe of DEGs
     '''
-    pass 
 
+    # 1: find clusters using leiden or louvain by clustering_adata function
+    if condition_col is None or condition_1 is None or condition_2 is None:
+        print("Error: Missing condition information.")
+        return None
+
+    adata_clusters = clustering_adata(adata)  # Use the provided clustering_adata function
+
+    # 2: loop through each cluster, extract cells belonging to the cluster, and find DEGs
+    clusters = adata_clusters.obs['leiden'].unique()
+    result_dfs = []  # store DEG dataframes for each cluster
+
+    for cluster in clusters:
+        print(f"Finding DEGs for cluster {cluster}")
+
+        # 2.1. extrac cells belonging to the cluster (adata.copy())
+        adata_cluster = adata_clusters[adata_clusters.obs['leiden'] == cluster].copy()
+
+        # 2.2. call paired_ttest function using the adata_cluster to find DEGs conditioning on condition_1 and condition_2
+        DEGs_cluster = paird_ttest(adata_cluster, condition_key=condition_col, sample_id_col='sample_id', patient_id_col='patient_id', pval_cutoff=0.05, log2fc_cutoff=1)
+
+        # 2.3. store the DEGs for this cluster in the result_dfs list
+        if DEGs_cluster is not None:
+            result_dfs.append(DEGs_cluster)
+
+        # just for fun, some UMAPs
+        sc.pp.neighbors(adata_cluster, n_neighbors=30, n_pcs=50)
+        sc.tl.umap(adata_cluster)
+        sc.pl.umap(adata_cluster, color=['cell_type', 'timepoint'], legend_loc='on data', title=f'Cluster {cluster}')
+        
+        # UMAP for DEGs
+        if not DEGs_cluster.empty:
+            # Convert 'pval' column to numeric type
+            DEGs_cluster['pval'] = pd.to_numeric(DEGs_cluster['pval'])
+            
+            top_n_degs_cluster = DEGs_cluster.nsmallest(top_n_degs, 'pval')
+            sc.pl.umap(adata_cluster, color=top_n_degs_cluster.index.tolist(), use_raw=False, cmap='viridis', legend_loc='on data')
+
+    # Combine all the DEG dataframes into a single DataFrame
+    DEGs = pd.concat(result_dfs)
+
+    return DEGs
