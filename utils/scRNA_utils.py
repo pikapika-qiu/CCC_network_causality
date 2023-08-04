@@ -593,17 +593,36 @@ def performDEG(adata, groupby, group1 = 'pre', group2 = 'on'):
     Returns:
         pandas.DataFrame
     """
-    if 'louvain' 
+    # Check if 'louvain' column exists in adata.obs
+    if 'louvain' not in adata.obs.columns:
+        print("Column 'louvain' not found in adata.obs. Run clustering first.")
+        
+        
     # Identify clusters
     sc.tl.louvain(adata)
+    clusters = adata.obs['louvain'].unique()
 
-    for cluster_id in adata.obs['']
-    # Perform differential expression analysis between two clusters
-    sc.tl.rank_sum_test(adata, groupby=groupby, groups=[group1, group2])
+    for cluster_id in clusters:
+        # Extract the data only for the current cluster
+        sub_adata = adata[adata.obs['louvain'] == cluster_id]
 
-    # Access the results
-    result = adata.uns['rank_sum_test']
-    groups_df = result['gene_names'][result['reject']]  # Differentially expressed genes
+        # Perform differential expression analysis between two groups
+        sc.tl.rank_sum_test(sub_adata, groupby=groupby, groups=[group1, group2])
+
+        # Access the results
+        result = sub_adata.uns['rank_sum_test']
+        if 'gene_names' in result and 'reject' in result:
+            cluster_diff_genes = result['gene_names'][result['reject']]  # Differentially expressed genes for this cluster
+            cluster_diff_genes = pd.DataFrame(cluster_diff_genes, columns=[f'Cluster_{cluster_id}_DEGs'])
+            groups_df = pd.concat([groups_df, cluster_diff_genes], axis=1)
+            
+    # for cluster_id in adata.obs['']
+    # # Perform differential expression analysis between two clusters
+    # sc.tl.rank_sum_test(adata, groupby=groupby, groups=[group1, group2])
+
+    # # Access the results
+    # result = adata.uns['rank_sum_test']
+    # groups_df = result['gene_names'][result['reject']]  # Differentially expressed genes
     
     return groups_df
 
