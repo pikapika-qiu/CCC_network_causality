@@ -583,17 +583,18 @@ def performDEG(adata, groupby, group1 = 'pre', group2 = 'on'):
 
     Parameters:
         adata (scanpy.AnnData)
-        groupby (str): Key in `adata.obs` 
+        groupby (str): Key in `adata.obs` grouping
         group1 (str): Name of the first group to contrast, default 'pre'
         group2 (str): Name of the second group to contrast, default 'on'
 
     Returns:
         pandas.DataFrame
     """
-
+    if 'louvain' 
     # Identify clusters
     sc.tl.louvain(adata)
 
+    for cluster_id in adata.obs['']
     # Perform differential expression analysis between two clusters
     sc.tl.rank_sum_test(adata, groupby=groupby, groups=[group1, group2])
 
