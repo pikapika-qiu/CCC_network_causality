@@ -120,6 +120,7 @@ def clustering_adata(adata, resolution = 0.5, n_top_genes=5000):
     
     # check if adata has already been through selection of high variance genes
     if not 'highly_variable' in adata.var.columns:
+        print ("Select ", n_top_genes, " high variance genes")
         # select high veriable genes
         sc.pp.highly_variable_genes(adata, n_top_genes=n_top_genes)
         # filter adata
@@ -136,8 +137,8 @@ def clustering_adata(adata, resolution = 0.5, n_top_genes=5000):
     sc.tl.leiden(adata, resolution = resolution)
 
     #plot UMAP
-    # sc.tl.umap(adata)
-    # sc.pl.umap(adata, color=['leiden'], legend_loc='on data', title='leiden')
+    sc.tl.umap(adata)
+    sc.pl.umap(adata, color=['leiden'],  title='leiden')
 
     return adata
 
