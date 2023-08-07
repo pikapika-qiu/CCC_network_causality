@@ -654,7 +654,7 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
     2. loop through each cluster:
         2.1. extract cells belonging to the cluster (adata.copy())
         2.2. Call paird_ttest funciton using the adata_cluster find DEGs conditioning on the condition_1 and condition_2
-        2.2. return the dataframe of DEGs
+        2.3. return the dataframe of DEGs
     '''
 
     # 1: find clusters using leiden or louvain by clustering_adata function
@@ -677,7 +677,7 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
         # 2.2. call paired_ttest function using the adata_cluster to find DEGs conditioning on condition_1 and condition_2
         DEGs_cluster = paird_ttest(adata_cluster, condition_key=condition_col, sample_id_col='sample_id', patient_id_col='patient_id', pval_cutoff=0.05, log2fc_cutoff=1)
 
-        # 2.3. store the DEGs for this cluster in the result_dfs list
+        # 2.3. return the dataframe of DEGs
         if DEGs_cluster is not None:
             result_dfs.append(DEGs_cluster)
 
