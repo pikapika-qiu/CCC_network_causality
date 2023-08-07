@@ -36,6 +36,62 @@
 <h1>scRNA's documentation<a class="headerlink" href="#scrna-s-documentation" title="Permalink to this heading">¶</a></h1>
 <div class="toctree-wrapper compound">
 </div>
+<span class="target" id="module-scRNA_utils"></span><p>load_10X_matrices.py</p>
+<p>This function module will load a fold of 10X matrix files into a single sparse matrix
+and return a single AnnData object by concatenating the matrices.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="scRNA_utils.clustering_adata">
+<span class="sig-prename descclassname"><span class="pre">scRNA_utils.</span></span><span class="sig-name descname"><span class="pre">clustering_adata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">adata</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scRNA_utils.clustering_adata" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function will cluster an AnnData object</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><p>adata: AnnData object</p>
+</dd>
+<dt>Returns:</dt><dd><p>adata: AnnData object with a new column in adata.obs called 'leiden' that contains the cluster label for each cell</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scRNA_utils.find_cluster_DEGs_pairwise">
+<span class="sig-prename descclassname"><span class="pre">scRNA_utils.</span></span><span class="sig-name descname"><span class="pre">find_cluster_DEGs_pairwise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">adata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cluster_label</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">condition_key</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scRNA_utils.find_cluster_DEGs_pairwise" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function will find differentially expressed genes between two conditions for a given cluster.
+Steps in the process:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Identify cells from a sample that belong to a specific cluster.</p></li>
+<li><p>Create pseudo-bulk RNA data for each sample.</p></li>
+<li><p>Match samples from the same patient.</p></li>
+<li><p>Perform pairwise t-test between two conditions for each gene.</p></li>
+</ol>
+</div></blockquote>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scRNA_utils.labelClusterWithCellType">
+<span class="sig-prename descclassname"><span class="pre">scRNA_utils.</span></span><span class="sig-name descname"><span class="pre">labelClusterWithCellType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">adata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cell_type_markers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cluster_column</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'leiden'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scRNA_utils.labelClusterWithCellType" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function will label each cluster with the cell type that is most abundant in that cluster.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><p>adata: AnnData object
+cell_type_markers: a dictionary where the key is the cell type and the value is a list of markers for that cell type
+cluster_column: the column in adata.obs that contains the cluster labels</p>
+</dd>
+<dt>Returns:</dt><dd><p>adata: AnnData object with a new column in adata.obs called 'cell_type' that contains the cell type label for each cell</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="scRNA_utils.load_10X_matrices">
+<span class="sig-prename descclassname"><span class="pre">scRNA_utils.</span></span><span class="sig-name descname"><span class="pre">load_10X_matrices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matrix_dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#scRNA_utils.load_10X_matrices" title="Permalink to this definition">¶</a></dt>
+<dd><p>This function will load a fold of 10X matrix files into a single sparse matrix.</p>
+<dl class="simple">
+<dt>Parameters:</dt><dd><p>matrix_dir (str): The directory containing the 10X matrix files.</p>
+</dd>
+<dt>Returns:</dt><dd><p>A single AnnData object containing the concatenated matrices.</p>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 <section id="indices-and-tables">
 <h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this heading">¶</a></h1>
