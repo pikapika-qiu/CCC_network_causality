@@ -681,6 +681,8 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
         if DEGs_cluster is not None:
             result_dfs.append(DEGs_cluster)
 
+        print(f"DEGs: {DEGs_cluster}")
+
         # just for fun, some UMAPs
         sc.pp.neighbors(adata_cluster, n_neighbors=30, n_pcs=50)
         sc.tl.umap(adata_cluster)
