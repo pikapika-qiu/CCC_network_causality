@@ -638,9 +638,9 @@ def performDEG(adata, groupby, group1 = 'pre', group2 = 'on'):
 # diff_genes = performDEG(adata, groupby='louvain', group1='cluster_1', group2='cluster_2')
 
 
-def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condition_2 = None, top_n_degs=20):
+def findDEGsFromClusters(adata, condition_col=None, condition_1=None, condition_2=None, top_n_degs=100):
     '''
-    This function search for clusters and then find DEGs with each clusters conditioning on specifid conditons.
+    This function searches for clusters and then finds DEGs with each cluster conditioning on specified conditions.
 
     Parameters
     --------
@@ -649,11 +649,12 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
     condition_col: the column name of the condition in the adata.obs
     condition_1: the condition_1    
     condition_2: the condition_2
+    top_n_degs: Number of top DEGs to consider for plotting
 
     Returns:
     --------
     DEGs: A dataframe with DEGs and their logFC, pval, pval_adj, etc.
-
+    significant_genes_dict: A dictionary containing significant genes for each cluster.
 
     pseudocode:
     1. find clusters by call leiden or louvian by clustering_adata function
@@ -661,9 +662,14 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
         2.1. extract cells belonging to the cluster (adata.copy())
         2.2. Call paird_ttest funciton using the adata_cluster find DEGs conditioning on the condition_1 and condition_2
         2.3. return the dataframe of DEGs
+        2.4. find significant genes using sc.tl.rank_genes_groups
+        2.5. plot UMAP for significant genes
+        2.6. save a dataframe of significant DEGs
+        2.7. plot volcano plot of DEGs
+
     '''
 
-    # 1: find clusters using leiden or louvain by clustering_adata function
+    # 1: find clusters using leiden or louvain by calling clustering_adata function
     if condition_col is None or condition_1 is None or condition_2 is None:
         print("Error: Missing condition information.")
         return None
@@ -673,6 +679,7 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
     # 2: loop through each cluster, extract cells belonging to the cluster, and find DEGs
     clusters = adata_clusters.obs['leiden'].unique()
     result_dfs = []  # store DEG dataframes for each cluster
+    significant_genes_df = {} # store dataframe for significant DEGs
 
     for cluster in clusters:
         print(f"Finding DEGs for cluster {cluster}")
@@ -680,17 +687,37 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
         # 2.1. extrac cells belonging to the cluster (adata.copy())
         adata_cluster = adata_clusters[adata_clusters.obs['leiden'] == cluster].copy()
 
-        # 2.2. call paired_ttest function using the adata_cluster to find DEGs conditioning on condition_1 and condition_2
+        # 2.2. Call paired_ttest function using the adata_cluster to find DEGs conditioning on condition_1 and condition_2
         DEGs_cluster = paird_ttest(adata_cluster, condition_key=condition_col, sample_id_col='sample_id', patient_id_col='patient_id', pval_cutoff=0.05, log2fc_cutoff=1)
 
         # 2.3. return the dataframe of DEGs
         if DEGs_cluster is not None:
             result_dfs.append(DEGs_cluster)
+        
+        # Create a copy of the original adata and apply log1p transformation to the adata_cluster
+        adata_copy = adata.copy()
+        sc.pp.log1p(adata_copy[adata_copy.obs.index.isin(adata_cluster.obs.index)])
+                
+        # 2.4. find significant genes using sc.tl.rank_genes_groups
+        print(f"plotting significant genes for cluster {cluster}")
 
-        # just for fun, some UMAPs
+        # Set the 'base' value in adata.uns['log1p']
+        adata_cluster.uns['log1p'] = {'base': 2}
+        
+        sc.tl.rank_genes_groups(adata_cluster, groupby=condition_col, method='wilcoxon')
+        sc.pl.rank_genes_groups(adata_cluster, n_genes=25, sharey=False)
+
+
+        # sc.pp.log1p(adata_copy[adata_copy.obs.index.isin(adata_cluster.obs.index)])
+        # sc.tl.rank_genes_groups(adata_cluster, groupby='leiden', method='wilcoxon')
+        # sc.pl.rank_genes_groups(adata_cluster, n_genes=25, sharey=False)
+
+        print(f"DEGs: {DEGs_cluster}")
+
+        # 2.5 some UMAPs
         sc.pp.neighbors(adata_cluster, n_neighbors=30, n_pcs=50)
         sc.tl.umap(adata_cluster)
-        sc.pl.umap(adata_cluster, color=['cell_type', 'timepoint'], legend_loc='on data', title=f'Cluster {cluster}')
+        sc.pl.umap(adata_cluster, color=['cell_type', 'timepoint'], legend_loc='on data', title = f"cluster {cluster}")
         
         # UMAP for DEGs
         if not DEGs_cluster.empty:
@@ -700,7 +727,53 @@ def findDEGsFromClusters(adata, condition_col = None, condition_1 = None, condit
             top_n_degs_cluster = DEGs_cluster.nsmallest(top_n_degs, 'pval')
             sc.pl.umap(adata_cluster, color=top_n_degs_cluster.index.tolist(), use_raw=False, cmap='viridis', legend_loc='on data')
 
+
+        # 2.6. save a dataframe of significant DEGs
+        significant_genes_df = pd.DataFrame(columns=['pval', 'log2FC', 'mean_1', 'mean_2', 'qval'])
+        
+        if not DEGs_cluster.empty:
+            significant_genes = DEGs_cluster[(DEGs_cluster['pval'] < 0.05) & (DEGs_cluster['qval'] < 0.1)]
+            significant_genes_df = significant_genes_df.append(significant_genes, ignore_index=True)
+            
+            
+        # 2.7 volcano plot: (still a WIP)
+
+        if not DEGs_cluster.empty:
+            print('creating volcano plot:')
+            # Create a volcano plot using hvplot
+            vc_df = significant_genes_df  # Use your significant_genes_df DataFrame
+            vc_df['names'] = vc_df.index
+            vc_df.hvplot.scatter(
+                "log2FC", "pval", 
+                flip_yaxis=True, logy=True, 
+                hover_cols=["names"]
+            ).opts(title='Volcano Plot of DEGs')
+
+        # # Set the significance thresholds
+        # pval_threshold = 0.05
+        # qval_threshold = 0.1
+
+        # # Select significant DEGs
+        # significant_DEGs = significant_genes_df[(significant_genes_df['pval'] < pval_threshold) & (significant_genes_df['qval'] < qval_threshold)]
+
+        # # Create a volcano plot
+        # plt.figure(figsize=(10, 6))
+        # plt.scatter(significant_DEGs['log2FC'], -1 * np.log10(significant_DEGs['pval']), c='blue', label='Significant DEGs')
+
+        # # Add vertical lines for fold change cutoffs
+        # plt.axvline(x=1, color='red', linestyle='--', label='Log2FC = 1')
+        # plt.axvline(x=-1, color='red', linestyle='--', label='Log2FC = -1')
+
+        # # Add labels and legend
+        # plt.xlabel('log2FC')
+        # plt.ylabel('-log10(p-value)')
+        # plt.title('Volcano Plot of DEGs')
+        # plt.legend()
+        # plt.grid(True)
+        # plt.show()
+
+
     # Combine all the DEG dataframes into a single DataFrame
     DEGs = pd.concat(result_dfs)
 
-    return DEGs
+    return DEGs, significant_genes_df
