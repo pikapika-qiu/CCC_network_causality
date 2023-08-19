@@ -439,7 +439,14 @@ def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_co
         return None
     X = np.zeros((nConditions, nPatients, nGenes), dtype=np.float32)
 
-    res_df = pd.DataFrame(index=adata.var_names, columns = ['pval', 'log2fc', 'mean_condition1', 'mean_condition2'])
+    condition1 = adata.obs[condition_key].unique()[0]
+    condition2 = adata.obs[condition_key].unique()[1]
+    condition1_mean_name = condition1 + '_mean'
+    condition2_mean_name = condition2 + '_mean'
+
+    # create a dataframe to store the results
+    colNames = ['pval', 'log2fc', condition1_mean_name, condition2_mean_name]
+    res_df = pd.DataFrame(index=adata.var_names, columns = colNames)
     patients = adata.obs[patient_id_col].unique()  # this is a numpy array
     for index, patient in np.ndenumerate(patients):
         indx_p = index[0]
@@ -449,8 +456,7 @@ def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_co
             # print ("Patient %s does not have two conditions" % patient)
             continue
         # extract data from the patient under condition 1 and condition 2
-        condition1 = adata.obs[condition_key].unique()[0]
-        condition2 = adata.obs[condition_key].unique()[1]
+
         # print ("Extract data from patient %s under condition %s & %s" % (patient, condition1, condition2))
         X[0, indx_p, :] = adata.raw.X[(adata.obs[patient_id_col] == patient) & (adata.obs[condition_key] == condition1), :]
         X[1, indx_p, :] = adata.raw.X[(adata.obs[patient_id_col] == patient) & (adata.obs[condition_key] == condition2), :]
@@ -470,8 +476,8 @@ def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_co
             log2fc = np.log2(np.mean(x_1) / np.mean(x_2))
         res_df.loc[gene_name, 'pval'] = pval
         res_df.loc[gene_name, 'log2fc'] = log2fc
-        res_df.loc[gene_name, 'mean_condition1'] = mean_condition1
-        res_df.loc[gene_name, 'mean_condition2'] = mean_condition2
+        res_df.loc[gene_name, condition1_mean_name] = mean_condition1
+        res_df.loc[gene_name, condition2_mean_name] = mean_condition2
 
     # estimate q-value based on p-value        
     qvalue = importr('qvalue')
