@@ -1,0 +1,6 @@
+--2023-08-27 15:25:51--  https://pitt.sharepoint.com/sites/HNSCsinglecellmanuscriptgroup/Shared%20Documents/Forms/AllItems.aspx?FolderCTID=0x01200005D615CD9F33D6429CD657E6EA8F3AF9
+Resolving pitt.sharepoint.com (pitt.sharepoint.com)... 13.107.138.8, 13.107.136.8, 2620:1ec:8f8::8, ...
+Connecting to pitt.sharepoint.com (pitt.sharepoint.com)|13.107.138.8|:443... connected.
+HTTP request sent, awaiting response... 403 Forbidden
+2023-08-27 15:25:51 ERROR 403: Forbidden.
+
