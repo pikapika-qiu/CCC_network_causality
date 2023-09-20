@@ -674,7 +674,7 @@ def findDEGsFromClusters(adata, condition_col=None, condition_1=None, condition_
         print("Error: Missing condition information.")
         return None
 
-    adata_clusters = clustering_adata(adata)  # Use the provided clustering_adata function
+    adata_clusters = clustering_adata(adata) # call clustering_adata function
 
     # 2: loop through each cluster, extract cells belonging to the cluster, and find DEGs
     clusters = adata_clusters.obs['leiden'].unique()
@@ -702,17 +702,13 @@ def findDEGsFromClusters(adata, condition_col=None, condition_1=None, condition_
         print(f"plotting significant genes for cluster {cluster}")
 
         # Set the 'base' value in adata.uns['log1p']
-        adata_cluster.uns['log1p'] = {'base': 2}
+        adata_cluster.uns['log1p'] = {'base': 2} # check if already logged
         
         sc.tl.rank_genes_groups(adata_cluster, groupby=condition_col, method='wilcoxon')
         sc.pl.rank_genes_groups(adata_cluster, n_genes=25, sharey=False)
 
 
-        # sc.pp.log1p(adata_copy[adata_copy.obs.index.isin(adata_cluster.obs.index)])
-        # sc.tl.rank_genes_groups(adata_cluster, groupby='leiden', method='wilcoxon')
-        # sc.pl.rank_genes_groups(adata_cluster, n_genes=25, sharey=False)
-
-        print(f"DEGs: {DEGs_cluster}")
+        print(f"DEGs: \n{DEGs_cluster}")
 
         # 2.5 some UMAPs
         sc.pp.neighbors(adata_cluster, n_neighbors=30, n_pcs=50)
@@ -734,20 +730,20 @@ def findDEGsFromClusters(adata, condition_col=None, condition_1=None, condition_
         if not DEGs_cluster.empty:
             significant_genes = DEGs_cluster[(DEGs_cluster['pval'] < 0.05) & (DEGs_cluster['qval'] < 0.1)]
             significant_genes_df = significant_genes_df.append(significant_genes, ignore_index=True)
-            
+            # seperate clusters and save as csv
             
         # 2.7 volcano plot: (still a WIP)
 
-        if not DEGs_cluster.empty:
-            print('creating volcano plot:')
-            # Create a volcano plot using hvplot
-            vc_df = significant_genes_df  # Use your significant_genes_df DataFrame
-            vc_df['names'] = vc_df.index
-            vc_df.hvplot.scatter(
-                "log2FC", "pval", 
-                flip_yaxis=True, logy=True, 
-                hover_cols=["names"]
-            ).opts(title='Volcano Plot of DEGs')
+        # if not DEGs_cluster.empty:
+        #     print('creating volcano plot:')
+        #     # Create a volcano plot using hvplot
+        #     vc_df = significant_genes_df
+        #     vc_df['names'] = vc_df.index
+        #     vc_df.hvplot.scatter(
+        #         "log2FC", "pval", 
+        #         flip_yaxis=True, logy=True, 
+        #         hover_cols=["names"]
+        #     ).opts(title='Volcano Plot of DEGs')
 
         # # Set the significance thresholds
         # pval_threshold = 0.05
