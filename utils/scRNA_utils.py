@@ -437,6 +437,7 @@ def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_co
     if nConditions != 2:
         print ("Number of conditions is not 2")
         return None
+    
     X = np.zeros((nConditions, nPatients, nGenes), dtype=np.float32)
 
     condition1 = adata.obs[condition_key].unique()[0]
@@ -448,6 +449,7 @@ def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_co
     colNames = ['pval', 'log2fc', condition1_mean_name, condition2_mean_name]
     res_df = pd.DataFrame(index=adata.var_names, columns = colNames)
     patients = adata.obs[patient_id_col].unique()  # this is a numpy array
+    
     for index, patient in np.ndenumerate(patients):
         indx_p = index[0]
         # print ("Processing patient %s" % patient)
@@ -466,6 +468,11 @@ def paird_ttest(adata, condition_key = None, sample_id_col = None, patient_id_co
     for i in range(nGenes):  # need check how to parallelize this loop, maybe use cupy
         x_1 = X[0, :, i]
         x_2 = X[1, :, i]
+        
+        # check if x_1 and x_2 are all zeros
+        if np.sum(x_1) == 0 or np.sum(x_2) == 0:
+            continue
+        
         pval = stats.ttest_rel(x_1, x_2)[1]
         gene_name = adata.var_names[i]        
         mean_condition1 = np.mean(x_1)
