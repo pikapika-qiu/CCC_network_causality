@@ -979,10 +979,161 @@ def calculate_residuals_correlation(results, adata_T_pseudo, adata_M_pseudo, met
         residuals_g2 = model_g2.resid
 
         if method == 'pearson':
-            corr = pearsonr(g1_df[g1], L_R)[0]
+            corr = pearsonr(residuals_g1, residuals_g2)[0]
         elif method == 'spearman':
-            corr = spearmanr(g1_df[g1], L_R)[0]
+            corr = spearmanr(residuals_g1, residuals_g2)[0]
 
         results.at[index, 'g1_residualvsg2_residuals_correlation'] = corr
 
     return results
+
+
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from scipy.stats import spearmanr, pearsonr
+
+def plot_CIT_DEGcorr(g1, g2, L, R, DEG_exp, pseudo_1, pseudo_2):
+    # Define a custom palette
+    palette = {'pre': "#E69F00", 'on': "#56B4E9"}
+    #replace the treatment column 0 pre and 1 on
+    gene_df['treatment'] = gene_df['treatment'].replace({0: 'pre', 1: 'on'})
+    # Set font sizes
+    title_fontsize = 14
+    axis_fontsize = 14
+    legend_fontsize = 12
+
+    def adjust_plot_limits(ax, x_data, y_data):
+        x_min, x_max = x_data.min(), x_data.max()
+        y_min, y_max = y_data.min(), y_data.max()
+        x_padding = (x_max - x_min) * 0.1
+        y_padding = (y_max - y_min) * 0.1
+        ax.set_xlim(x_min - x_padding, x_max + x_padding)
+        ax.set_ylim(y_min - y_padding, y_max + y_padding)
+
+    # Plot the jointplot between DEG of g1 and g2
+    g1_exp = DEG_exp[g1]
+    g2_exp = DEG_exp[g2]
+    df1 = pd.DataFrame({g1: g1_exp, g2: g2_exp, 'treatment': DEG_exp['treatment']})
+    df1 = df1.dropna()
+    g = sns.jointplot(x=g1, y=g2, data=df1, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x=g1, y=g2, data=df1, scatter=False, ax=g.ax_joint, color='black')
+    adjust_plot_limits(g.ax_joint, df1[g1], df1[g2])
+    
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+    cor = pearsonr(df1[g1], df1[g2])[0]
+    plt.suptitle(f'Correlation between {g1} and {g2} is {cor:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+     # Plot the jointplot between DEG of g1 and g2 residue
+    L_values = pseudo_1[:, L].X.toarray().flatten()
+    R_values = pseudo_2[:, R].X.toarray().flatten()
+    L_R = L_values * R_values
+    X = sm.add_constant(L_R)
+
+    # Fit OLS model for g2
+    model_g2 = sm.OLS(g2_exp, X).fit()
+    residuals_g2 = model_g2.resid
+
+    # Fit OLS model for g1
+    model_g1 = sm.OLS(g1_exp, X).fit()
+    residuals_g1 = model_g1.resid
+
+    #   Create DataFrame for residuals
+    df_res = pd.DataFrame({
+        'G_1_residual': residuals_g1,
+        'G_2_residual': residuals_g2,
+        'treatment': DEG_exp['treatment']
+    })
+
+    # Plot the residuals
+    g = sns.jointplot(x='G_1_residual', y='G_2_residual', data=df_res, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x='G_1_residual', y='G_2_residual', data=df_res, scatter=False, ax=g.ax_joint, color='black')
+
+    # Adjust plot limits if needed
+    adjust_plot_limits(g.ax_joint, df_res['G_1_residual'], df_res['G_2_residual'])
+
+    # Customize plot appearance
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+
+    # Calculate and display correlation
+    corr_res = spearmanr(df_res['G_1_residual'], df_res['G_2_residual'])[0]
+    plt.suptitle(f'Correlation between residuals of G_1 and G_2 is {corr_res:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+
+    # Plot the jointplot between DEG of g1 and L
+    L_exp = pseudo_1[:, L].X.toarray().flatten()
+    L_exp = pd.DataFrame(L_exp, columns=[L], index=pseudo_1.obs['sample_id'])
+    df2 = pd.DataFrame({g1: g1_exp, L: L_exp.iloc[:, 0], 'treatment': DEG_exp['treatment']})
+    df2 = df2.dropna()
+    g = sns.jointplot(x=g1, y=L, data=df2, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x=g1, y=L, data=df2, scatter=False, ax=g.ax_joint, color='black')
+    adjust_plot_limits(g.ax_joint, df2[g1], df2[L])
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+    corr2 = spearmanr(df2[g1], df2[L])[0]
+    plt.suptitle(f'Correlation between {g1} and {L} is {corr2:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+    # Plot the jointplot between DEG of R and g2
+    R_exp = pseudo_2[:, R].X.toarray().flatten()
+    R_exp = pd.DataFrame(R_exp, columns=[R], index=pseudo_2.obs['sample_id'])
+    df4 = pd.DataFrame({R: R_exp.iloc[:, 0], g2: g2_exp, 'treatment': DEG_exp['treatment']})
+    df4 = df4.dropna()
+    g = sns.jointplot(x=R, y=g2, data=df4, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x=R, y=g2, data=df4, scatter=False, ax=g.ax_joint, color='black')
+    adjust_plot_limits(g.ax_joint, df4[R], df4[g2])
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+    corr4 = spearmanr(df4[R], df4[g2])[0]
+    plt.suptitle(f'Correlation between {R} and {g2} is {corr4:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+    # Plot the jointplot between g1 and L*R
+    df3 = pd.DataFrame({g1: g1_exp, L + '*' + R: L_R, 'treatment': DEG_exp['treatment']})
+    df3 = df3.dropna()
+     # remove the sample with largest number for L*R
+    # df3 = df3[df3[L + '*' + R] != df3[L + '*' + R].max()]
+    g = sns.jointplot(x=g1, y=L + '*' + R, data=df3, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x=g1, y=L + '*' + R, data=df3, scatter=False, ax=g.ax_joint, color='black')
+    adjust_plot_limits(g.ax_joint, df3[g1], df3[L + '*' + R])
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+    corr3 = spearmanr(df3[g1], df3[L + '*' + R])[0]
+    plt.suptitle(f'Correlation between {g1} and {L}*{R} is {corr3:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+    # Plot the jointplot between g2 and L*R
+    df5 = pd.DataFrame({g2: g2_exp, L + '*' + R: L_R, 'treatment': DEG_exp['treatment']})
+    df5 = df5.dropna()
+    # df5 = df5[df5[L + '*' + R] != df5[L + '*' + R].max()]
+    g = sns.jointplot(x=L + '*' + R, y=g2, data=df5, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x=L + '*' + R, y=g2, data=df5, scatter=False, ax=g.ax_joint, color='black')
+    adjust_plot_limits(g.ax_joint, df5[L + '*' + R], df5[g2])
+    # remove the sample with largest number for L*R
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+    corr5 = spearmanr(df5[g2], df5[L + '*' + R])[0]
+    plt.suptitle(f'Correlation between {g2} and {L}*{R} is {corr5:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+
+   
+
