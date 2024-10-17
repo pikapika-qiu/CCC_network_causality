@@ -1,4 +1,3 @@
-# CCC_network_causality
 
 Cell-Cell Communication Dynamics in the Tumor Microenvironment During Anti-PD1 Therapy in Breast Cancer Patients
 

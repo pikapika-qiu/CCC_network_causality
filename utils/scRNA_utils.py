@@ -903,44 +903,105 @@ def calculate_gene_correlation(results, adata_1_pseudo, adata_2_pseudo, method='
     
     return results
 
-def calculate_geneLR_correlation(results, adata_1_pseudo, adata_M_pseudo, method='pearson'):
+def calculate_g2_R_correlation(results, adata_2_pseudo, method='pearson'):
     if method not in ['pearson', 'spearman']:
         raise ValueError("Method must be either 'pearson' or 'spearman'")
     
-    results['g1vsLR_correlation'] = 0
+    results['g2vsR_correlation'] = 0
+
+    for index, row in results.iterrows():
+        g2 = row['g2'].split('_')[0]
+        R = row['R']
+
+        if g2 not in adata_2_pseudo.var_names:
+            continue
+
+        g2_data = adata_2_pseudo[:, g2].X
+        g2_df = pd.DataFrame(g2_data, columns=[g2], index=adata_2_pseudo.obs['sample_id'])
+        g2_df = g2_df.dropna()
+
+        R_data = adata_2_pseudo[:, R].X
+        R_df = pd.DataFrame(R_data, columns=[R], index=adata_2_pseudo.obs['sample_id'])
+        R_df = R_df.dropna()
+
+        if method == 'pearson':
+            corr = pearsonr(g2_df[g2], R_df[R])[0]
+        elif method == 'spearman':
+            corr = spearmanr(g2_df[g2], R_df[R])[0]
+
+        results.loc[index, 'g2vsR_correlation'] = corr
+    
+    return results
+
+
+# def calculate_geneLR_correlation(results, adata_1_pseudo, adata_M_pseudo, method='pearson'):
+#     if method not in ['pearson', 'spearman']:
+#         raise ValueError("Method must be either 'pearson' or 'spearman'")
+    
+#     results['g1vsLR_correlation'] = 0
+
+#     for index, row in results.iterrows():
+#         g1 = row['g1'].split('_')[0]
+#         L = row['L']
+#         R = row['R']
+
+#         if g1 not in adata_1_pseudo.var_names or L not in adata_M_pseudo.var_names or R not in adata_M_pseudo.var_names:
+#             continue
+
+#         g1_data = adata_1_pseudo[:, g1].X
+#         g1_df = pd.DataFrame(g1_data, columns=[g1], index=adata_1_pseudo.obs['sample_id'])
+#         g1_df = g1_df.dropna()
+
+#         L_data = adata_M_pseudo[:, L].X
+#         L_df = pd.DataFrame(L_data, columns=[L], index=adata_M_pseudo.obs['sample_id'])
+#         L_df = L_df.dropna()
+
+#         R_data = adata_M_pseudo[:, R].X
+#         R_df = pd.DataFrame(R_data, columns=[R], index=adata_M_pseudo.obs['sample_id'])
+#         R_df = R_df.dropna()
+
+#         L_df.columns = [R + '_vs_' + L]
+#         R_df.columns = L_df.columns
+
+#         L_R = L_df.multiply(R_df, axis=0)
+#         L_R = L_R.iloc[:, 0]
+
+#         if method == 'pearson':
+#             corr_g1_LR = pearsonr(g1_df[g1], L_R)[0]
+#         elif method == 'spearman':
+#             corr_g1_LR = spearmanr(g1_df[g1], L_R)[0]
+
+#         results.loc[index, 'g1vsLR_correlation'] = corr_g1_LR
+    
+#     return results
+
+def calculate_g1_L_correlation(results, adata_1_pseudo, method='pearson'):
+    if method not in ['pearson', 'spearman']:
+        raise ValueError("Method must be either 'pearson' or 'spearman'")
+    
+    results['g1vsL_correlation'] = 0
 
     for index, row in results.iterrows():
         g1 = row['g1'].split('_')[0]
         L = row['L']
-        R = row['R']
 
-        if g1 not in adata_1_pseudo.var_names or L not in adata_M_pseudo.var_names or R not in adata_M_pseudo.var_names:
+        if g1 not in adata_1_pseudo.var_names:
             continue
 
         g1_data = adata_1_pseudo[:, g1].X
         g1_df = pd.DataFrame(g1_data, columns=[g1], index=adata_1_pseudo.obs['sample_id'])
         g1_df = g1_df.dropna()
 
-        L_data = adata_M_pseudo[:, L].X
-        L_df = pd.DataFrame(L_data, columns=[L], index=adata_M_pseudo.obs['sample_id'])
+        L_data = adata_1_pseudo[:, L].X
+        L_df = pd.DataFrame(L_data, columns=[L], index=adata_1_pseudo.obs['sample_id'])
         L_df = L_df.dropna()
 
-        R_data = adata_M_pseudo[:, R].X
-        R_df = pd.DataFrame(R_data, columns=[R], index=adata_M_pseudo.obs['sample_id'])
-        R_df = R_df.dropna()
-
-        L_df.columns = [R + '_vs_' + L]
-        R_df.columns = L_df.columns
-
-        L_R = L_df.multiply(R_df, axis=0)
-        L_R = L_R.iloc[:, 0]
-
         if method == 'pearson':
-            corr_g1_LR = pearsonr(g1_df[g1], L_R)[0]
+            corr_g1_g2 = pearsonr(g1_df[g1], L_df[L])[0]
         elif method == 'spearman':
-            corr_g1_LR = spearmanr(g1_df[g1], L_R)[0]
+            corr_g1_g2 = spearmanr(g1_df[g1], L_df[L])[0]
 
-        results.loc[index, 'g1vsLR_correlation'] = corr_g1_LR
+        results.loc[index, 'g1vsL_correlation'] = corr_g1_g2
     
     return results
 
@@ -989,6 +1050,70 @@ def calculate_residuals_correlation(results, adata_T_pseudo, adata_M_pseudo, met
 
 
 
+import os
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import pearsonr, spearmanr
+import statsmodels.api as sm
+
+
+
+
+def CIT_test_multiR(DEG_pairs, lrpairs, adata_1_pseudo, adata_2_pseudo, gene_df, method="kci", p_value_threshold=0.05):
+    results = pd.DataFrame(columns=['g1', 'g2', 'L', 'R1', 'R2', 'pValue'])
+
+    for index, row in DEG_pairs.iterrows():
+        g1 = row['g1']
+        g2 = row['g2']
+        for L, R1, R2 in lrpairs.values:
+            # Check if L, R1, and R2 can be found in the DEG expression data
+            if L in adata_1_pseudo.var_names and R1 in adata_2_pseudo.var_names and R2 in adata_2_pseudo.var_names:
+                # Get the L_T, R1_M, and R2_M from pseudo_T and pseudo_M
+                L_T = adata_1_pseudo[:, L].X
+                L_T = pd.DataFrame(L_T, columns=[L], index=adata_1_pseudo.obs['sample_id']).dropna()
+                
+                R1_M = adata_2_pseudo[:, R1].X
+                R1_M = pd.DataFrame(R1_M, columns=[R1], index=adata_2_pseudo.obs['sample_id']).dropna()
+                
+                R2_M = adata_2_pseudo[:, R2].X
+                R2_M = pd.DataFrame(R2_M, columns=[R2], index=adata_2_pseudo.obs['sample_id']).dropna()
+
+                # Calculate L*R1 and L*R2 with added noise
+                L_T.columns = [R1 + '_vs_' + L]
+                R1_M.columns = L_T.columns
+                L_R1 = L_T.multiply(R1_M, axis=0).iloc[:, 0]
+                L_T.columns = [R2 + '_vs_' + L]
+                R2_M.columns = L_T.columns
+                L_R2 = L_T.multiply(R2_M, axis=0).iloc[:, 0]
+
+                # Make a DataFrame with g1, g2, L*R1, and L*R2
+                if g1 not in gene_df.columns or g2 not in gene_df.columns:
+                    continue
+
+                g1_T = gene_df[g1]
+                g2_M = gene_df[g2]
+                df = pd.DataFrame({g1: g1_T, g2: g2_M, 'L*R1': L_R1, 'L*R2': L_R2}).dropna()
+
+                # Convert df to numpy array
+                df_numpy = df.to_numpy()
+
+                # Perform the chosen independence test
+                if method == "kci":
+                    cit_obj = CIT(df_numpy, "kci")
+                elif method == "fisherz":
+                    cit_obj = CIT(df_numpy, "fisherz")
+                else:
+                    raise ValueError("Unsupported method. Use 'kci' or 'fisherz'.")
+
+                # Condition on L*R1 (index 2) and L*R2 (index 3)
+                pValue = cit_obj(0, 1, [2, 3])
+
+                if pValue > p_value_threshold:
+                    results = pd.concat([results, pd.DataFrame({'g1': [g1], 'g2': [g2], 'L': [L], 'R1': [R1], 'R2': [R2], 'pValue': [pValue]})], ignore_index=True)
+
+    return results
+
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -999,7 +1124,457 @@ def plot_CIT_DEGcorr(g1, g2, L, R, DEG_exp, pseudo_1, pseudo_2):
     # Define a custom palette
     palette = {'pre': "#E69F00", 'on': "#56B4E9"}
     #replace the treatment column 0 pre and 1 on
-    gene_df['treatment'] = gene_df['treatment'].replace({0: 'pre', 1: 'on'})
+    DEG_exp['treatment'] = DEG_exp['treatment'].replace({0: 'pre', 1: 'on'})
+    # Set font sizes
+    title_fontsize = 14
+    axis_fontsize = 14
+    legend_fontsize = 12
+
+    def adjust_plot_limits(ax, x_data, y_data):
+        x_min, x_max = x_data.min(), x_data.max()
+        y_min, y_max = y_data.min(), y_data.max()
+        x_padding = (x_max - x_min) * 0.1
+        y_padding = (y_max - y_min) * 0.1
+        ax.set_xlim(x_min - x_padding, x_max + x_padding)
+        ax.set_ylim(y_min - y_padding, y_max + y_padding)
+
+    # Plot the jointplot between DEG of g1 and g2
+    g1_exp = pseudo_1[:, g1].X.toarray().flatten()
+    g2_exp = pseudo_2[:, g2].X.toarray().flatten()
+    df1 = pd.DataFrame({g1: g1_exp, g2: g2_exp, 'treatment': DEG_exp['treatment']})
+    df1 = df1.dropna()
+    g = sns.jointplot(x=g1, y=g2, data=df1, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x=g1, y=g2, data=df1, scatter=False, ax=g.ax_joint, color='black')
+    adjust_plot_limits(g.ax_joint, df1[g1], df1[g2])
+    
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+    cor = pearsonr(df1[g1], df1[g2])[0]
+    plt.suptitle(f'Correlation between {g1} and {g2} is {cor:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+     # Plot the jointplot between DEG of g1 and g2 residue
+    L_values = pseudo_1[:, L].X.toarray().flatten()
+    R_values = pseudo_2[:, R].X.toarray().flatten()
+    L_R = L_values * R_values
+    X = sm.add_constant(L_R)
+
+    # Fit OLS model for g2
+    model_g2 = sm.OLS(g2_exp, X).fit()
+    residuals_g2 = model_g2.resid
+
+    # Fit OLS model for g1
+    model_g1 = sm.OLS(g1_exp, X).fit()
+    residuals_g1 = model_g1.resid
+
+    #   Create DataFrame for residuals
+    df_res = pd.DataFrame({
+        'G_1_residual': residuals_g1,
+        'G_2_residual': residuals_g2,
+        'treatment': DEG_exp['treatment']
+    })
+
+    # Plot the residuals
+    g = sns.jointplot(x='G_1_residual', y='G_2_residual', data=df_res, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+    sns.regplot(x='G_1_residual', y='G_2_residual', data=df_res, scatter=False, ax=g.ax_joint, color='black')
+
+    # Adjust plot limits if needed
+    adjust_plot_limits(g.ax_joint, df_res['G_1_residual'], df_res['G_2_residual'])
+
+    # Customize plot appearance
+    g.ax_joint.tick_params(left=False, bottom=False)
+    g.ax_marg_x.tick_params(bottom=False)
+    g.ax_marg_y.tick_params(left=False)
+
+    # Calculate and display correlation
+    corr_res = pearsonr(df_res['G_1_residual'], df_res['G_2_residual'])[0]
+    plt.suptitle(f'Correlation between residuals of G_1 and G_2 is {corr_res:.3f}', fontsize=title_fontsize)
+    plt.subplots_adjust(top=0.95)
+    plt.show()
+
+
+
+# def plot_CIT_DEGcorr(g1, g2, L, R, DEG_exp, pseudo_1, pseudo_2, main_dir):
+#     # Define a custom palette
+#     palette = {'pre': "#E69F00", 'on': "#56B4E9"}
+#     # Replace the treatment column 0 pre and 1 on
+#     DEG_exp['treatment'] = DEG_exp['treatment'].replace({0: 'pre', 1: 'on'})
+#     # Set font sizes
+#     title_fontsize = 14
+#     axis_fontsize = 14
+#     legend_fontsize = 12
+
+#     def adjust_plot_limits(ax, x_data, y_data):
+#         x_min, x_max = x_data.min(), x_data.max()
+#         y_min, y_max = y_data.min(), y_data.max()
+#         x_padding = (x_max - x_min) * 0.1
+#         y_padding = (y_max - y_min) * 0.1
+#         ax.set_xlim(x_min - x_padding, x_max + x_padding)
+#         ax.set_ylim(y_min - y_padding, y_max + y_padding)
+
+#     def save_or_show(fig, filename):
+#         filepath = os.path.join(sub_dir, filename)
+#         fig.savefig(filepath)
+
+#     # Create a new subdirectory within the main directory
+#     sub_dir_name = f"CIT_DEGcorr_plots_{g1}_{g2}_{L}_{R}"
+#     sub_dir = os.path.join(main_dir, sub_dir_name)
+#     os.makedirs(sub_dir, exist_ok=True)
+
+#     # Plot the jointplot between DEG of g1 and g2
+#     g1_exp = DEG_exp[g1]
+#     g2_exp = DEG_exp[g2]
+#     df1 = pd.DataFrame({g1: g1_exp, g2: g2_exp, 'treatment': DEG_exp['treatment']})
+#     df1 = df1.dropna()
+#     g = sns.jointplot(x=g1, y=g2, data=df1, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+#     sns.regplot(x=g1, y=g2, data=df1, scatter=False, ax=g.ax_joint, color='black')
+#     adjust_plot_limits(g.ax_joint, df1[g1], df1[g2])
+    
+#     g.ax_joint.tick_params(left=False, bottom=False)
+#     g.ax_marg_x.tick_params(bottom=False)
+#     g.ax_marg_y.tick_params(left=False)
+#     cor = pearsonr(df1[g1], df1[g2])[0]
+#     plt.suptitle(f'Correlation between {g1} and {g2} is {cor:.3f}', fontsize=title_fontsize)
+#     plt.subplots_adjust(top=0.95)
+#     save_or_show(plt.gcf(), 'g1_g2_plot.png')
+#     plt.close()
+
+#     # Plot the jointplot between DEG of g1 and g2 residuals
+#     L_values = pseudo_1[:, L].X.toarray().flatten()
+#     R_values = pseudo_2[:, R].X.toarray().flatten()
+#     L_R = L_values * R_values
+#     X = sm.add_constant(L_R)
+
+#     # Fit OLS model for g2
+#     model_g2 = sm.OLS(g2_exp, X).fit()
+#     residuals_g2 = model_g2.resid
+
+#     # Fit OLS model for g1
+#     model_g1 = sm.OLS(g1_exp, X).fit()
+#     residuals_g1 = model_g1.resid
+
+#     # Create DataFrame for residuals
+#     df_res = pd.DataFrame({
+#         'G_1_residual': residuals_g1,
+#         'G_2_residual': residuals_g2,
+#         'treatment': DEG_exp['treatment']
+#     })
+
+#     # Plot the residuals
+#     g = sns.jointplot(x='G_1_residual', y='G_2_residual', data=df_res, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+#     sns.regplot(x='G_1_residual', y='G_2_residual', data=df_res, scatter=False, ax=g.ax_joint, color='black')
+#     adjust_plot_limits(g.ax_joint, df_res['G_1_residual'], df_res['G_2_residual'])
+    
+#     g.ax_joint.tick_params(left=False, bottom=False)
+#     g.ax_marg_x.tick_params(bottom=False)
+#     g.ax_marg_y.tick_params(left=False)
+#     corr_res = spearmanr(df_res['G_1_residual'], df_res['G_2_residual'])[0]
+#     plt.suptitle(f'Correlation between residuals of G_1 and G_2 is {corr_res:.3f}', fontsize=title_fontsize)
+#     plt.subplots_adjust(top=0.95)
+#     save_or_show(plt.gcf(), 'residuals_plot.png')
+#     plt.close()
+
+#     # Plot the jointplot between DEG of g1 and L
+#     L_exp = pseudo_1[:, L].X.toarray().flatten()
+#     L_exp = pd.DataFrame(L_exp, columns=[L], index=pseudo_1.obs['sample_id'])
+#     df2 = pd.DataFrame({g1: g1_exp, L: L_exp.iloc[:, 0], 'treatment': DEG_exp['treatment']})
+#     df2 = df2.dropna()
+#     g = sns.jointplot(x=g1, y=L, data=df2, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+#     sns.regplot(x=g1, y=L, data=df2, scatter=False, ax=g.ax_joint, color='black')
+#     adjust_plot_limits(g.ax_joint, df2[g1], df2[L])
+    
+#     g.ax_joint.tick_params(left=False, bottom=False)
+#     g.ax_marg_x.tick_params(bottom=False)
+#     g.ax_marg_y.tick_params(left=False)
+#     corr2 = spearmanr(df2[g1], df2[L])[0]
+#     plt.suptitle(f'Correlation between {g1} and {L} is {corr2:.3f}', fontsize=title_fontsize)
+#     plt.subplots_adjust(top=0.95)
+#     save_or_show(plt.gcf(), 'g1_L_jointplot.png')
+#     plt.close()
+
+#     # Plot the jointplot between DEG of R and g2
+#     R_exp = pseudo_2[:, R].X.toarray().flatten()
+#     R_exp = pd.DataFrame(R_exp, columns=[R], index=pseudo_2.obs['sample_id'])
+#     df4 = pd.DataFrame({R: R_exp.iloc[:, 0], g2: g2_exp, 'treatment': DEG_exp['treatment']})
+#     df4 = df4.dropna()
+#     g = sns.jointplot(x=R, y=g2, data=df4, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+#     sns.regplot(x=R, y=g2, data=df4, scatter=False, ax=g.ax_joint, color='black')
+#     adjust_plot_limits(g.ax_joint, df4[R], df4[g2])
+    
+#     g.ax_joint.tick_params(left=False, bottom=False)
+#     g.ax_marg_x.tick_params(bottom=False)
+#     g.ax_marg_y.tick_params(left=False)
+#     corr4 = spearmanr(df4[R], df4[g2])[0]
+#     plt.suptitle(f'Correlation between {R} and {g2} is {corr4:.3f}', fontsize=title_fontsize)
+#     plt.subplots_adjust(top=0.95)
+#     save_or_show(plt.gcf(), 'R_g2_plot.png')
+#     plt.close()
+
+#     # Plot the jointplot between g1 and L*R
+#     df3 = pd.DataFrame({g1: g1_exp, L + '*' + R: L_R, 'treatment': DEG_exp['treatment']})
+#     df3 = df3.dropna()
+#     g = sns.jointplot(x=g1, y=L + '*' + R, data=df3, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+#     sns.regplot(x=g1, y=L + '*' + R, data=df3, scatter=False, ax=g.ax_joint, color='black')
+#     adjust_plot_limits(g.ax_joint, df3[g1], df3[L + '*' + R])
+    
+#     g.ax_joint.tick_params(left=False, bottom=False)
+#     g.ax_marg_x.tick_params(bottom=False)
+#     g.ax_marg_y.tick_params(left=False)
+#     corr3 = spearmanr(df3[g1], df3[L + '*' + R])[0]
+#     plt.suptitle(f'Correlation between {g1} and {L}*{R} is {corr3:.3f}', fontsize=title_fontsize)
+#     plt.subplots_adjust(top=0.95)
+#     save_or_show(plt.gcf(), 'g1_LR_plot.png')
+#     plt.close()
+
+#     # Plot the jointplot between g2 and L*R
+#     df5 = pd.DataFrame({g2: g2_exp, L + '*' + R: L_R, 'treatment': DEG_exp['treatment']})
+#     df5 = df5.dropna()
+#     g = sns.jointplot(x=L + '*' + R, y=g2, data=df5, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
+#     sns.regplot(x=L + '*' + R, y=g2, data=df5, scatter=False, ax=g.ax_joint, color='black')
+#     adjust_plot_limits(g.ax_joint, df5[L + '*' + R], df5[g2])
+    
+#     g.ax_joint.tick_params(left=False, bottom=False)
+#     g.ax_marg_x.tick_params(bottom=False)
+#     g.ax_marg_y.tick_params(left=False)
+#     corr5 = spearmanr(df5[g2], df5[L + '*' + R])[0]
+#     plt.suptitle(f'Correlation between {g2} and {L}*{R} is {corr5:.3f}', fontsize=title_fontsize)
+#     plt.subplots_adjust(top=0.95)
+#     save_or_show(plt.gcf(), 'g2_LR_plot.png')
+#     plt.close()
+
+
+import pandas as pd
+import statsmodels.api as sm
+from scipy.stats import pearsonr, spearmanr
+
+def calculate_residuals_correlation_multiR(results, adata_T_pseudo, adata_M_pseudo, method='pearson'):
+    results['g1_residualvsg2_residuals_correlation'] = 0
+
+    for index, row in results.iterrows():
+        g1 = row['g1'].split('_')[0]
+        g2 = row['g2'].split('_')[0]
+        L = row['L']
+        R1 = row['R1']
+        R2 = row['R2']
+
+        if g1 not in adata_T_pseudo.var_names or g2 not in adata_M_pseudo.var_names:
+            continue
+
+        g1_T = adata_T_pseudo[:, g1].X.toarray().flatten()
+        g2_M = adata_M_pseudo[:, g2].X.toarray().flatten()
+        L_T = adata_T_pseudo[:, L].X.toarray().flatten()
+        R1_M = adata_M_pseudo[:, R1].X.toarray().flatten()
+        R2_M = adata_M_pseudo[:, R2].X.toarray().flatten()
+
+        # Calculate L*R1 and L*R2
+        L_R1 = L_T * R1_M
+        L_R2 = L_T * R2_M
+
+        # Create DataFrames for g1 and g2 with L*R1 and L*R2 as independent variables
+        df_g1 = pd.DataFrame({g1: g1_T, 'L*R1': L_R1, 'L*R2': L_R2})
+        df_g2 = pd.DataFrame({g2: g2_M, 'L*R1': L_R1, 'L*R2': L_R2})
+        df_g1 = df_g1.dropna()
+        df_g2 = df_g2.dropna()
+
+        # Calculate residuals for g1
+        X_g1 = sm.add_constant(df_g1[['L*R1', 'L*R2']])
+        y_g1 = df_g1[g1]
+        model_g1 = sm.OLS(y_g1, X_g1).fit()
+        residuals_g1 = model_g1.resid
+
+        # Calculate residuals for g2
+        X_g2 = sm.add_constant(df_g2[['L*R1', 'L*R2']])
+        y_g2 = df_g2[g2]
+        model_g2 = sm.OLS(y_g2, X_g2).fit()
+        residuals_g2 = model_g2.resid
+
+        # Calculate the correlation between the residuals
+        if method == 'pearson':
+            corr = pearsonr(residuals_g1, residuals_g2)[0]
+        elif method == 'spearman':
+            corr = spearmanr(residuals_g1, residuals_g2)[0]
+
+        results.at[index, 'g1_residualvsg2_residuals_correlation'] = corr
+
+    return results
+
+# results include the columns 'g1', 'g2' as a list of genes and 'L', 'R' as the ligand and receptor
+def calculate_GEM_correlation(results, adata_1_pseudo, adata_2_pseudo, method='pearson'):
+    if method not in ['pearson', 'spearman']:
+        raise ValueError("Method must be either 'pearson' or 'spearman'")
+    
+    results['g1vsg2_correlation'] = 0
+
+    for index, row in results.iterrows():
+        g1 = row['g1']
+        g2 = row['g2']
+
+        # Ensure g1 and g2 are lists
+        if not isinstance(g1, list):
+            g1 = [g1]
+        if not isinstance(g2, list):
+            g2 = [g2]
+
+        # Check if all genes in g1 are present
+        missing_genes_g1 = set(g1) - set(adata_1_pseudo.var_names)
+        if missing_genes_g1:
+            print(f"Genes {missing_genes_g1} not found in adata_1_pseudo")
+            continue
+
+        # Get the data for g1 and compute mean
+        g1_data = adata_1_pseudo[:, g1].X
+        g1_mean = np.mean(g1_data, axis=1)
+        g1_df = pd.DataFrame(g1_mean, columns=['g1_mean'], index=adata_1_pseudo.obs['sample_id'])
+        g1_df = g1_df.dropna()
+
+        # Repeat for g2
+        missing_genes_g2 = set(g2) - set(adata_2_pseudo.var_names)
+        if missing_genes_g2:
+            print(f"Genes {missing_genes_g2} not found in adata_2_pseudo")
+            continue
+
+        g2_data = adata_2_pseudo[:, g2].X
+        g2_mean = np.mean(g2_data, axis=1)
+        g2_df = pd.DataFrame(g2_mean, columns=['g2_mean'], index=adata_2_pseudo.obs['sample_id'])
+        g2_df = g2_df.dropna()
+
+        # Align the samples
+        common_samples = g1_df.index.intersection(g2_df.index)
+        g1_values = g1_df.loc[common_samples, 'g1_mean']
+        g2_values = g2_df.loc[common_samples, 'g2_mean']
+
+        # Calculate the correlation
+        if method == 'pearson':
+            corr_g1_g2 = pearsonr(g1_values, g2_values)[0]
+        elif method == 'spearman':
+            corr_g1_g2 = spearmanr(g1_values, g2_values)[0]
+
+        results.loc[index, 'g1vsg2_correlation'] = corr_g1_g2
+    
+    return results
+
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from scipy.stats import pearsonr, spearmanr
+import scipy.sparse
+
+def calculate_residuals_GEM_correlation(results, adata_T_pseudo, adata_M_pseudo, method='pearson'):
+    if method not in ['pearson', 'spearman']:
+        raise ValueError("Method must be either 'pearson' or 'spearman'")
+    
+    results['g1_residualvsg2_residuals_correlation'] = 0
+
+    for index, row in results.iterrows():
+        g1 = row['g1']
+        g2 = row['g2']
+        L = row['L']
+        R = row['R']
+
+        # Ensure g1, g2, L, and R are lists
+        if not isinstance(g1, list):
+            g1 = [g1]
+        if not isinstance(g2, list):
+            g2 = [g2]
+        if not isinstance(L, list):
+            L = [L]
+        if not isinstance(R, list):
+            R = [R]
+
+        # Check for missing genes in adata_T_pseudo and adata_M_pseudo
+        missing_genes_g1 = set(g1) - set(adata_T_pseudo.var_names)
+        missing_genes_g2 = set(g2) - set(adata_M_pseudo.var_names)
+        missing_genes_L = set(L) - set(adata_T_pseudo.var_names)
+        missing_genes_R = set(R) - set(adata_M_pseudo.var_names)
+
+        if missing_genes_g1:
+            print(f"Genes {missing_genes_g1} not found in adata_T_pseudo")
+            continue
+        if missing_genes_g2:
+            print(f"Genes {missing_genes_g2} not found in adata_M_pseudo")
+            continue
+        if missing_genes_L:
+            print(f"Genes {missing_genes_L} not found in adata_T_pseudo")
+            continue
+        if missing_genes_R:
+            print(f"Genes {missing_genes_R} not found in adata_M_pseudo")
+            continue
+
+        # Extract and average expression data for g1 in adata_T_pseudo
+        g1_T_data = adata_T_pseudo[:, g1].X
+        if scipy.sparse.issparse(g1_T_data):
+            g1_T_data = g1_T_data.toarray()
+        g1_T_mean = np.mean(g1_T_data, axis=1)
+
+        # Extract and average expression data for g2 in adata_M_pseudo
+        g2_M_data = adata_M_pseudo[:, g2].X
+        if scipy.sparse.issparse(g2_M_data):
+            g2_M_data = g2_M_data.toarray()
+        g2_M_mean = np.mean(g2_M_data, axis=1)
+
+        # Extract and average expression data for L in adata_T_pseudo
+        L_T_data = adata_T_pseudo[:, L].X
+        if scipy.sparse.issparse(L_T_data):
+            L_T_data = L_T_data.toarray()
+        L_T_mean = np.mean(L_T_data, axis=1)
+
+        # Extract and average expression data for R in adata_M_pseudo
+        R_M_data = adata_M_pseudo[:, R].X
+        if scipy.sparse.issparse(R_M_data):
+            R_M_data = R_M_data.toarray()
+        R_M_mean = np.mean(R_M_data, axis=1)
+
+        # Compute the product of L_T_mean and R_M_mean
+        L_R = L_T_mean * R_M_mean
+
+        # Create DataFrames with sample indices
+        df_g1 = pd.DataFrame({'g1_mean': g1_T_mean, 'L*R': L_R}, index=adata_T_pseudo.obs_names)
+        df_g2 = pd.DataFrame({'g2_mean': g2_M_mean, 'L*R': L_R}, index=adata_M_pseudo.obs_names)
+
+        # Drop NaN values
+        df_g1 = df_g1.dropna()
+        df_g2 = df_g2.dropna()
+
+        # Align samples by common indices
+        common_samples = df_g1.index.intersection(df_g2.index)
+        df_g1 = df_g1.loc[common_samples]
+        df_g2 = df_g2.loc[common_samples]
+
+        if df_g1.empty or df_g2.empty:
+            print(f"No common samples between g1 and g2 at index {index}")
+            continue
+
+        # Linear regression to obtain residuals for g1
+        X_g1 = sm.add_constant(df_g1['L*R'])
+        y_g1 = df_g1['g1_mean']
+        model_g1 = sm.OLS(y_g1, X_g1).fit()
+        residuals_g1 = model_g1.resid
+
+        # Linear regression to obtain residuals for g2
+        X_g2 = sm.add_constant(df_g2['L*R'])
+        y_g2 = df_g2['g2_mean']
+        model_g2 = sm.OLS(y_g2, X_g2).fit()
+        residuals_g2 = model_g2.resid
+
+        # Calculate correlation between residuals
+        if method == 'pearson':
+            corr = pearsonr(residuals_g1, residuals_g2)[0]
+        elif method == 'spearman':
+            corr = spearmanr(residuals_g1, residuals_g2)[0]
+
+        results.at[index, 'g1_residualvsg2_residuals_correlation'] = corr
+
+    return results
+
+
+def plot_CIT_GEM_DEGcorr(g1, g2, L, R, DEG_exp, pseudo_1, pseudo_2):
+    # Define a custom palette
+    palette = {'pre': "#E69F00", 'on': "#56B4E9"}
+    #replace the treatment column 0 pre and 1 on
+    DEG_exp['treatment'] = DEG_exp['treatment'].replace({0: 'pre', 1: 'on'})
     # Set font sizes
     title_fontsize = 14
     axis_fontsize = 14
@@ -1064,76 +1639,157 @@ def plot_CIT_DEGcorr(g1, g2, L, R, DEG_exp, pseudo_1, pseudo_2):
     g.ax_marg_y.tick_params(left=False)
 
     # Calculate and display correlation
-    corr_res = spearmanr(df_res['G_1_residual'], df_res['G_2_residual'])[0]
+    corr_res = pearsonr(df_res['G_1_residual'], df_res['G_2_residual'])[0]
     plt.suptitle(f'Correlation between residuals of G_1 and G_2 is {corr_res:.3f}', fontsize=title_fontsize)
     plt.subplots_adjust(top=0.95)
     plt.show()
 
 
-    # Plot the jointplot between DEG of g1 and L
-    L_exp = pseudo_1[:, L].X.toarray().flatten()
-    L_exp = pd.DataFrame(L_exp, columns=[L], index=pseudo_1.obs['sample_id'])
-    df2 = pd.DataFrame({g1: g1_exp, L: L_exp.iloc[:, 0], 'treatment': DEG_exp['treatment']})
-    df2 = df2.dropna()
-    g = sns.jointplot(x=g1, y=L, data=df2, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
-    sns.regplot(x=g1, y=L, data=df2, scatter=False, ax=g.ax_joint, color='black')
-    adjust_plot_limits(g.ax_joint, df2[g1], df2[L])
-    g.ax_joint.tick_params(left=False, bottom=False)
-    g.ax_marg_x.tick_params(bottom=False)
-    g.ax_marg_y.tick_params(left=False)
-    corr2 = spearmanr(df2[g1], df2[L])[0]
-    plt.suptitle(f'Correlation between {g1} and {L} is {corr2:.3f}', fontsize=title_fontsize)
-    plt.subplots_adjust(top=0.95)
-    plt.show()
+def CIT_GEM_test(grouped_df, adata_1_pseudo, adata_2_pseudo, gene_df, method="fisherz"):
+    # create a new column to store the pValue
+    grouped_df['pValue'] = np.nan
+    for index, row in grouped_df.iterrows():
+        g1 = row['GEM_1']
+        g2 = row['GEM_2']
+        L = row['L']
+        R = row['R']
+        if L in adata_1_pseudo.var_names and R in adata_2_pseudo.var_names:
+                    # Get the L_T and R_B from pseudo_T and pseudo_M
+                    L_T = adata_1_pseudo[:, L].X
+                    L_T = pd.DataFrame(L_T, columns=[L], index=adata_1_pseudo.obs['sample_id']).dropna()
+                    R_M = adata_2_pseudo[:, R].X
+                    R_M = pd.DataFrame(R_M, columns=[R], index=adata_2_pseudo.obs['sample_id']).dropna()
+                    
+                    # Calculate L*R
+                    L_T.columns = [R + '_vs_' + L]
+                    R_M.columns = L_T.columns
+                    L_R = L_T.multiply(R_M, axis=0).iloc[:, 0]
 
-    # Plot the jointplot between DEG of R and g2
-    R_exp = pseudo_2[:, R].X.toarray().flatten()
-    R_exp = pd.DataFrame(R_exp, columns=[R], index=pseudo_2.obs['sample_id'])
-    df4 = pd.DataFrame({R: R_exp.iloc[:, 0], g2: g2_exp, 'treatment': DEG_exp['treatment']})
-    df4 = df4.dropna()
-    g = sns.jointplot(x=R, y=g2, data=df4, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
-    sns.regplot(x=R, y=g2, data=df4, scatter=False, ax=g.ax_joint, color='black')
-    adjust_plot_limits(g.ax_joint, df4[R], df4[g2])
-    g.ax_joint.tick_params(left=False, bottom=False)
-    g.ax_marg_x.tick_params(bottom=False)
-    g.ax_marg_y.tick_params(left=False)
-    corr4 = spearmanr(df4[R], df4[g2])[0]
-    plt.suptitle(f'Correlation between {R} and {g2} is {corr4:.3f}', fontsize=title_fontsize)
-    plt.subplots_adjust(top=0.95)
-    plt.show()
+                    # Make a DataFrame g1, g2 and L*R
+                    if g1 not in gene_df.columns or g2 not in gene_df.columns:
+                        continue
+                    
+                    g1_T = gene_df[g1]
+                    g2_M = gene_df[g2]
+                    df = pd.DataFrame({g1: g1_T, g2: g2_M, 'L*R': L_R}).dropna()
 
-    # Plot the jointplot between g1 and L*R
-    df3 = pd.DataFrame({g1: g1_exp, L + '*' + R: L_R, 'treatment': DEG_exp['treatment']})
-    df3 = df3.dropna()
-     # remove the sample with largest number for L*R
-    # df3 = df3[df3[L + '*' + R] != df3[L + '*' + R].max()]
-    g = sns.jointplot(x=g1, y=L + '*' + R, data=df3, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
-    sns.regplot(x=g1, y=L + '*' + R, data=df3, scatter=False, ax=g.ax_joint, color='black')
-    adjust_plot_limits(g.ax_joint, df3[g1], df3[L + '*' + R])
-    g.ax_joint.tick_params(left=False, bottom=False)
-    g.ax_marg_x.tick_params(bottom=False)
-    g.ax_marg_y.tick_params(left=False)
-    corr3 = spearmanr(df3[g1], df3[L + '*' + R])[0]
-    plt.suptitle(f'Correlation between {g1} and {L}*{R} is {corr3:.3f}', fontsize=title_fontsize)
-    plt.subplots_adjust(top=0.95)
-    plt.show()
+                    # Convert df to numpy array
+                    df_numpy = df.to_numpy()
 
-    # Plot the jointplot between g2 and L*R
-    df5 = pd.DataFrame({g2: g2_exp, L + '*' + R: L_R, 'treatment': DEG_exp['treatment']})
-    df5 = df5.dropna()
-    # df5 = df5[df5[L + '*' + R] != df5[L + '*' + R].max()]
-    g = sns.jointplot(x=L + '*' + R, y=g2, data=df5, hue='treatment', palette=palette, kind='scatter', marginal_kws=dict(fill=True))
-    sns.regplot(x=L + '*' + R, y=g2, data=df5, scatter=False, ax=g.ax_joint, color='black')
-    adjust_plot_limits(g.ax_joint, df5[L + '*' + R], df5[g2])
-    # remove the sample with largest number for L*R
-    g.ax_joint.tick_params(left=False, bottom=False)
-    g.ax_marg_x.tick_params(bottom=False)
-    g.ax_marg_y.tick_params(left=False)
-    corr5 = spearmanr(df5[g2], df5[L + '*' + R])[0]
-    plt.suptitle(f'Correlation between {g2} and {L}*{R} is {corr5:.3f}', fontsize=title_fontsize)
-    plt.subplots_adjust(top=0.95)
-    plt.show()
+                    # Perform the chosen independence test
+                    if method == "kci":
+                        cit_obj = CIT(df_numpy, "kci")
+                    elif method == "fisherz":
+                        cit_obj = CIT(df_numpy, "fisherz")
+                    else:
+                        raise ValueError("Unsupported method. Use 'kci' or 'fisherz'.")
+                    
+                    pValue = cit_obj(0, 1, [2])
+                    
+                    grouped_df.loc[index, 'pValue'] = pValue
+    return grouped_df
 
 
-   
+def calculate_g1_L_GEM_correlation(results, adata_1_pseudo, method='pearson'):
+    if method not in ['pearson', 'spearman']:
+        raise ValueError("Method must be either 'pearson' or 'spearman'")
+    
+    results['GEM1vsL_correlation'] = 0
 
+    for index, row in results.iterrows():
+        g1 = row['GEM_1']
+        L = row['L']
+
+
+        g1_data = adata_1_pseudo.obs[g1]
+        g1_df = pd.DataFrame(g1_data, columns=[g1], index=adata_1_pseudo.obs['sample_id'])
+        g1_df = g1_df.dropna()
+
+        L_data = adata_1_pseudo[:, L].X
+        L_df = pd.DataFrame(L_data, columns=[L], index=adata_1_pseudo.obs['sample_id'])
+        L_df = L_df.dropna()
+
+        if method == 'pearson':
+            corr_g1_g2 = pearsonr(g1_df[g1], L_df[L])[0]
+        elif method == 'spearman':
+            corr_g1_g2 = spearmanr(g1_df[g1], L_df[L])[0]
+
+        results.loc[index, 'GEM1vsL_correlation'] = corr_g1_g2
+    
+    return results
+
+def calculate_g2_R_GEM_correlation(results, adata_2_pseudo, method='pearson'):
+    if method not in ['pearson', 'spearman']:
+        raise ValueError("Method must be either 'pearson' or 'spearman'")
+    
+    results['GEM2vsR_correlation'] = 0
+
+    for index, row in results.iterrows():
+        g2 = row['GEM_2']
+        R = row['R']
+
+        g2_data = adata_2_pseudo.obs[g2]
+        g2_df = pd.DataFrame(g2_data, columns=[g2], index=adata_2_pseudo.obs['sample_id'])
+        g2_df = g2_df.dropna()
+
+        R_data = adata_2_pseudo[:, R].X
+        R_df = pd.DataFrame(R_data, columns=[R], index=adata_2_pseudo.obs['sample_id'])
+        R_df = R_df.dropna()
+
+        if method == 'pearson':
+            corr = pearsonr(g2_df[g2], R_df[R])[0]
+        elif method == 'spearman':
+            corr = spearmanr(g2_df[g2], R_df[R])[0]
+
+        results.loc[index, 'GEM2vsR_correlation'] = corr
+    
+    return results
+
+
+def calculate_geneLR_GEM_correlation(results, adata_1_pseudo, adata_2_pseudo, method='pearson'):
+    if method not in ['pearson', 'spearman']:
+        raise ValueError("Method must be either 'pearson' or 'spearman'")
+    
+    results['GEM1vsLR_correlation'] = 0
+    results['GEM2vsLR_correlation'] = 0
+
+    for index, row in results.iterrows():
+        g1 = row['GEM_1']
+        g2 = row['GEM_2']
+        L = row['L']
+        R = row['R']
+
+
+        g1_data = adata_1_pseudo.obs[g1]
+        g1_df = pd.DataFrame(g1_data, columns=[g1], index=adata_1_pseudo.obs['sample_id'])
+        g1_df = g1_df.dropna()
+
+        g2_data = adata_2_pseudo.obs[g2]
+        g2_df = pd.DataFrame(g2_data, columns=[g2], index=adata_2_pseudo.obs['sample_id'])
+        g2_df = g2_df.dropna()
+
+        L_data = adata_1_pseudo[:, L].X
+        L_df = pd.DataFrame(L_data, columns=[L], index=adata_1_pseudo.obs['sample_id'])
+        L_df = L_df.dropna()
+
+        R_data = adata_2_pseudo[:, R].X
+        R_df = pd.DataFrame(R_data, columns=[R], index=adata_2_pseudo.obs['sample_id'])
+        R_df = R_df.dropna()
+
+        L_df.columns = [R + '_vs_' + L]
+        R_df.columns = L_df.columns
+
+        L_R = L_df.multiply(R_df, axis=0)
+        L_R = L_R.iloc[:, 0]
+
+        if method == 'pearson':
+            corr_g1_LR = pearsonr(g1_df[g1], L_R)[0]
+            corr_g2_LR = pearsonr(g2_df[g2], L_R)[0]
+        elif method == 'spearman':
+            corr_g1_LR = spearmanr(g1_df[g1], L_R)[0]
+            corr_g2_LR = spearmanr(g2_df[g2], L_R)[0]
+
+        results.loc[index, 'GEM1vsLR_correlation'] = corr_g1_LR
+        results.loc[index, 'GEM2vsLR_correlation'] = corr_g2_LR
+
+    return results
